@@ -13,6 +13,7 @@ import { type Settings, defaultSettings } from '../types/settings';
 import { SECRETS_KEY, stripSecrets, extractSecrets, saveSecrets } from '../lib/secret-settings';
 import { loadLocalSettings } from '../lib/settings-load';
 import { subscribeToStore, notifyStore, getStoreSnapshot, pickSyncable, type SetSettings } from '../lib/settings-store';
+import { createCoalescedWriter } from '../lib/coalesced-write';
 import { useSettingsBackendSync } from '../hooks/useSettingsBackendSync';
 import { useSettingsCrossTab, KEY_TIMESTAMPS_STORAGE_KEY } from '../hooks/useSettingsCrossTab';
 
@@ -58,8 +59,35 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     settingsRef.current = settings;
   }, [settings]);
 
-  const { syncWithBackend, queuePush, markUnsynced } = useSettingsBackendSync(setSettings, settingsRef);
-  const { loadStamps, stamp, clearStamps } = useSettingsCrossTab(setSettings);
+  const { loadStamps, stamp } = useSettingsCrossTab(setSettings);
+  // Settles once storage has been read (and migrated) on mount.
+  const [initialLoad] = useState(() => {
+    let done!: () => void;
+    const promise = new Promise<void>((resolve) => (done = resolve));
+    return { promise, done };
+  });
+  const { syncWithBackend, queuePush, markUnsynced } = useSettingsBackendSync(
+    setSettings,
+    settingsRef,
+    stamp,
+    initialLoad.promise,
+  );
+
+  const [syncWriter] = useState(() => createCoalescedWriter((values) => syncStorage.setMultiple(values)));
+  useEffect(() => {
+    window.addEventListener('pagehide', syncWriter.flush);
+    return () => window.removeEventListener('pagehide', syncWriter.flush);
+  }, [syncWriter]);
+
+  // Focus is device-local, so other tabs' changes arrive on the local area.
+  useEffect(
+    () =>
+      localStore.onChange((changes) => {
+        const focus = changes.windom_focus?.newValue as Settings['focus'] | undefined;
+        if (focus) setSettings((prev) => ({ ...prev, focus }));
+      }),
+    [setSettings],
+  );
 
   // Load settings on mount, running legacy migration if needed
   useEffect(() => {
@@ -78,9 +106,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
 
       setLoaded(true);
+      initialLoad.done();
       await syncWithBackend(local);
     })();
-  }, [syncWithBackend, setSettings, loadStamps]);
+  }, [syncWithBackend, setSettings, loadStamps, initialLoad]);
 
   const get = useCallback(<S extends keyof Settings>(section: S): Settings[S] => settings[section], [settings]);
 
@@ -101,11 +130,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         ...prev,
         [section]: { ...(prev[section] as object), ...(patch as object) },
       }));
+      settingsRef.current = { ...settingsRef.current, [section]: mergedSection };
 
       queuePush({ [section]: mergedSection } as Partial<Settings>);
 
       const [saved, savedSecrets] = await Promise.all([
-        syncStorage.setMultiple({
+        syncWriter.write({
           [section]: stripSecrets({ [section]: mergedSection })[section],
           [KEY_TIMESTAMPS_STORAGE_KEY]: stamps,
         } as Record<string, unknown>),
@@ -114,7 +144,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       ]);
       return saved && savedSecrets;
     },
-    [queuePush, markUnsynced, stamp, setSettings],
+    [queuePush, markUnsynced, stamp, setSettings, syncWriter],
   );
 
   const updateMultiple = useCallback(
@@ -149,25 +179,30 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       queuePush(patches);
 
       const [saved, savedSecrets] = await Promise.all([
-        syncStorage.setMultiple(stripSecrets(storageUpdate)),
+        syncWriter.write(stripSecrets(storageUpdate)),
         saveSecrets(extractSecrets(storageUpdate)),
         markUnsynced(Object.keys(patches)),
       ]);
       return saved && savedSecrets;
     },
-    [queuePush, markUnsynced, stamp, setSettings],
+    [queuePush, markUnsynced, stamp, setSettings, syncWriter],
   );
 
   const reset = useCallback(async () => {
-    clearStamps();
     setSettings({ ...defaultSettings });
-    await syncStorage.clear();
-    await syncStorage.setMultiple(stripSecrets(defaultSettings) as unknown as Record<string, unknown>);
+    // Overwrite settings only: sync storage also holds the user's todos and events.
+    // Through the writer, so an edit still waiting there cannot land afterwards.
+    const written = syncWriter.write({
+      ...(stripSecrets(defaultSettings) as unknown as Record<string, unknown>),
+      [KEY_TIMESTAMPS_STORAGE_KEY]: stamp(Object.keys(defaultSettings)),
+    });
+    syncWriter.flush();
+    await written;
     await localStore.remove(SECRETS_KEY);
     await localStore.set('windom_focus', defaultSettings.focus);
     // A reset is an edit like any other: the next sync uploads the defaults.
     await markUnsynced(Object.keys(pickSyncable(defaultSettings)));
-  }, [clearStamps, setSettings, markUnsynced]);
+  }, [stamp, setSettings, markUnsynced, syncWriter]);
 
   return (
     <SettingsContext.Provider value={{ settings, loaded, get, update, updateMultiple, reset }}>

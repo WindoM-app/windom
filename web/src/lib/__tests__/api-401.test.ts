@@ -98,3 +98,27 @@ describe('a rate-limited refresh', () => {
     expect(logout).toHaveBeenCalled();
   });
 });
+
+describe('a refresh that fails without refusing the session', () => {
+  it.each([
+    ['a server error', () => Promise.resolve(new Response('{}', { status: 503 }))],
+    ['a network failure', () => Promise.reject(new TypeError('offline'))],
+  ])('keeps the user signed in after %s', async (_name, refresh) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        String(url).includes('/auth/refresh') ? refresh() : Promise.resolve(new Response('{}', { status: 401 })),
+      ),
+    );
+    const logout = vi.fn();
+    const expired = vi.fn();
+    setLogoutCallback(logout);
+    window.addEventListener('windom-session-expired', expired);
+
+    await apiFetch('/settings');
+
+    window.removeEventListener('windom-session-expired', expired);
+    expect(logout).not.toHaveBeenCalled();
+    expect(expired).not.toHaveBeenCalled();
+  });
+});

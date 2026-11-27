@@ -21,7 +21,8 @@ export function LinksSettings() {
           const faviconUrl = getFaviconUrl(link.url);
 
           return (
-            <div key={link.url || `link-${i}`} className="link-table-row">
+            // Keyed by position: a key made from the URL remounts the row on every keystroke.
+            <div key={i} className="link-table-row">
               <div className="link-favicon-cell">
                 {faviconUrl ? (
                   <img

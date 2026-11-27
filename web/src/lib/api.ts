@@ -82,11 +82,11 @@ const REFRESH_LOCK_KEY = 'windom_refresh_lock';
  * Read only straight after awaiting `refreshAccessToken`: the single-flight
  * promise means the value still describes the attempt just awaited.
  */
-let lastRefreshRateLimited = false;
+let lastRefreshTransient = false;
 
-/** True when the last refresh failed because the endpoint was rate limiting us. */
-export function refreshWasRateLimited(): boolean {
-  return lastRefreshRateLimited;
+/** True when the last refresh failed without saying anything about the session: 429, 5xx or no network. */
+export function refreshFailedTransiently(): boolean {
+  return lastRefreshTransient;
 }
 
 /**
@@ -132,7 +132,7 @@ async function releaseRefreshLock(): Promise<void> {
 
 async function doRefresh(): Promise<string | null> {
   // Describes this attempt only, so it is cleared before the attempt begins.
-  lastRefreshRateLimited = false;
+  lastRefreshTransient = false;
 
   // ── Cross-tab lock ──────────────────────────────────────────────────────
   // chrome.storage.local is shared across all tabs. If another tab is already
@@ -172,8 +172,14 @@ async function doRefresh(): Promise<string | null> {
       // it must not raise session-expired. Returning null still fails this
       // attempt - callers simply must not read that as "log out".
       if (res.status === 429) {
-        lastRefreshRateLimited = true;
+        lastRefreshTransient = true;
         refreshLog.warn('Rate limited - keeping the session and backing off');
+        return null;
+      }
+
+      // Nor does a server fault.
+      if (res.status >= 500) {
+        lastRefreshTransient = true;
         return null;
       }
 
@@ -214,6 +220,7 @@ async function doRefresh(): Promise<string | null> {
     return data.accessToken;
   } catch (err) {
     refreshLog.error('Network error:', err);
+    lastRefreshTransient = true;
     return null;
   } finally {
     await releaseRefreshLock();
@@ -296,10 +303,10 @@ export async function apiFetch(path: string, options: RequestInit = {}, _retry =
       return apiFetch(path, options, false);
     }
 
-    // Throttled is not expired. Logging out here would end the session over a
-    // limit that clears on its own.
-    if (refreshWasRateLimited()) {
-      log.warn('Refresh is rate limited - keeping the session');
+    // Unavailable is not expired. Logging out here would end the session over a
+    // fault that clears on its own.
+    if (refreshFailedTransiently()) {
+      log.warn('Refresh is unavailable - keeping the session');
       return res;
     }
 

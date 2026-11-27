@@ -87,6 +87,19 @@ describe('useIntegrationSync', () => {
     expect(written.calendar).toEqual({ days: 14, connected: true });
   });
 
+  it('writes nothing when the server agrees with what is stored', async () => {
+    settings = withIntegrations({
+      calendar: { ...settings.integrations.calendar, connected: true },
+      gmail: { ...settings.integrations.gmail, connected: true },
+      github: { ...settings.integrations.github, connected: true },
+    });
+    vi.mocked(apiGet).mockResolvedValue(serverReply);
+    renderHook(() => useIntegrationSync());
+    await act(async () => {});
+    expect(apiGet).toHaveBeenCalledTimes(1);
+    expect(updateMultiple).not.toHaveBeenCalled();
+  });
+
   it('clears every connected flag once when signed out, keeping other fields', async () => {
     user = null;
     settings = withIntegrations({ spotify: { connected: true, showTopTracks: true } });

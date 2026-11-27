@@ -70,14 +70,12 @@ describe('useSettingsCrossTab', () => {
     vi.restoreAllMocks();
   });
 
-  it('loadStamps reads stored stamps and clearStamps forgets them', async () => {
+  it('loadStamps reads stored stamps', async () => {
     vi.mocked(syncStorage.get).mockResolvedValue({ general: 99 });
     const { hook } = setup();
     await act(() => hook.result.current.loadStamps());
     expect(syncStorage.get).toHaveBeenCalledWith(KEY_TIMESTAMPS_STORAGE_KEY, {});
     expect(hook.result.current.stamp([])).toEqual({ general: 99 });
-    hook.result.current.clearStamps();
-    expect(hook.result.current.stamp([])).toEqual({});
   });
 
   it('unsubscribes on unmount', () => {

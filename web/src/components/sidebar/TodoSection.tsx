@@ -7,6 +7,7 @@ export function TodoSection() {
   const { todos, loaded, addTodo, toggleTodo, removeTodo } = useTodos();
   const [input, setInput] = useState('');
   const [adding, setAdding] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   // Ids with a toggle/remove write in flight. Their controls stay disabled
   // until the write settles, so a double click cannot act on one item twice.
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
@@ -31,8 +32,9 @@ export function TodoSection() {
     if (adding || !input.trim()) return;
     setAdding(true);
     try {
-      await addTodo(input);
-      setInput('');
+      const saved = await addTodo(input);
+      setSaveFailed(!saved);
+      if (saved) setInput('');
     } finally {
       setAdding(false);
     }
@@ -61,6 +63,11 @@ export function TodoSection() {
               />
             ))}
       </div>
+      {saveFailed && (
+        <p role="alert" className="auth-field-error">
+          Could not save. The synced task list may be full: remove finished tasks and try again.
+        </p>
+      )}
       <div className="todo-input-row">
         <input
           type="text"
