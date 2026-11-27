@@ -1071,6 +1071,8 @@ input.clock-size-slider:focus-visible {
   border-radius: var(--r-card);
   opacity: 1;
   cursor: default;
+  /* The pane opens over the clock, which a clear pane lets through at full strength. */
+  background-color: rgba(20, 20, 23, 0.9);
 }
 
 .dock-expand-icon {
