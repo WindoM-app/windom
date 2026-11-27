@@ -3,7 +3,8 @@
  * that take a different route from a content script (MV3 gives content
  * scripts no chrome.tabs; the background worker runs them instead).
  */
-import { hasChromeApi, isContentScript, sendTabCommand } from './chrome-runtime';
+import { hasChromeApi, isContentScript, sendTabCommand, sendToBackground } from './chrome-runtime';
+import { matchTabs, type TabMatch } from './web-search';
 
 /** Whether this context can query tabs directly. */
 export function canQueryTabs(): boolean {
@@ -31,8 +32,26 @@ export function onTabsChanged(cb: () => void): () => void {
 
 /** Activates a tab and, when its window is known, focuses that window. */
 export function focusTab(tabId: number, windowId?: number | null): void {
+  if (isContentScript) {
+    void sendToBackground({ type: 'WINDOM_CMD_FOCUS_TAB', tabId, windowId: windowId ?? undefined });
+    return;
+  }
   chrome.tabs.update(tabId, { active: true });
   if (windowId !== null && windowId !== undefined) chrome.windows.update(windowId, { focused: true });
+}
+
+/** Open tabs matching `q`, from either context. Empty when they cannot be read. */
+export async function searchOpenTabs(q: string): Promise<TabMatch[]> {
+  try {
+    if (!hasChromeApi) return [];
+    if (isContentScript) {
+      const reply = await sendToBackground<{ tabs?: TabMatch[] }>({ type: 'WINDOM_CMD_QUERY_TABS', query: q });
+      return reply?.tabs ?? [];
+    }
+    return canQueryTabs() ? matchTabs(await queryTabs(), q) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Opens a tab through chrome.tabs directly (extension pages only). */
