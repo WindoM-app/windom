@@ -79,6 +79,7 @@ export function useWeather() {
       if (manualLocation) {
         const geoRes = await fetch(
           `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(manualLocation)}&count=1&language=en&format=json`,
+          { priority: 'low' },
         );
         if (runIdRef.current !== runId) return;
         if (!geoRes.ok) throw new Error(`Geocoding error: ${geoRes.status}`);
@@ -105,6 +106,7 @@ export function useWeather() {
         try {
           const revRes = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
             headers: { 'Accept-Language': 'en' },
+            priority: 'low',
           });
           const revData = await revRes.json();
           resolvedCity =
@@ -120,6 +122,7 @@ export function useWeather() {
       const tempUnit = settings.weather.unit === 'C' ? 'celsius' : 'fahrenheit';
       const weatherRes = await fetch(
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&temperature_unit=${tempUnit}&timezone=auto`,
+        { priority: 'low' },
       );
       if (runIdRef.current !== runId) return;
       if (!weatherRes.ok) throw new Error(`Weather error: ${weatherRes.status}`);

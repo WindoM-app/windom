@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode, useRef } from 'react';
 import { useSettings } from './SettingsContext';
 import { useAuth } from './AuthContext';
 import { localStore as ls } from '../lib/chrome-storage';
@@ -54,19 +54,30 @@ export function BackgroundProvider({ children }: { children: ReactNode }) {
   // Destructure stable callbacks to avoid recreating loadUnsplash on every photoHistory render
   const { addPhoto } = photoHistory;
 
+  const latestBackgroundRef = useRef(0);
+
   const applyBackground = useCallback((imageUrl: string) => {
     const layer = document.getElementById('bg-zoom-layer');
     if (!layer) return;
+    // Only the most recent choice may land, however long an earlier one takes.
+    const latest = ++latestBackgroundRef.current;
     if (imageUrl.startsWith('linear-gradient') || imageUrl.startsWith('radial-gradient')) {
       layer.style.backgroundImage = imageUrl;
       setBackgroundReady(true);
     } else {
       const img = new Image();
-      img.onload = () => {
+      // The wallpaper is the largest paint: fetch it ahead of the widget requests,
+      // and decode it before the swap so it appears in one frame.
+      img.fetchPriority = 'high';
+      img.onload = async () => {
+        // A failed decode still leaves a loaded image the browser can paint.
+        await img.decode?.().catch(() => {});
+        if (latest !== latestBackgroundRef.current) return;
         layer.style.backgroundImage = `url('${imageUrl}')`;
         setBackgroundReady(true);
       };
       img.onerror = () => {
+        if (latest !== latestBackgroundRef.current) return;
         layer.style.backgroundImage = DEFAULT_GRADIENT;
         setBackgroundReady(true);
       };

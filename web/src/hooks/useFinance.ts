@@ -53,6 +53,7 @@ async function fetchStocksYahooV7(tickers: string[]): Promise<StockQuote[]> {
   const symbols = tickers.map(encodeURIComponent).join(',');
   const res = await fetch(
     `https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&symbols=${symbols}`,
+    { priority: 'low' },
   );
   if (!res.ok) throw new Error(`Yahoo v7 ${res.status}`);
 
@@ -86,6 +87,7 @@ async function fetchOneChart(ticker: string): Promise<StockQuote | null> {
   try {
     const res = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=2d`,
+      { priority: 'low' },
     );
     if (!res.ok) return null;
     const data = (await res.json()) as { chart?: { result?: Array<{ meta: YahooChartMeta }> } };
@@ -124,6 +126,7 @@ async function fetchStocks(tickers: string[]): Promise<StockQuote[]> {
 async function fetchCrypto(ids: string[]): Promise<CryptoQuote[]> {
   const res = await fetch(
     `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true`,
+    { priority: 'low' },
   );
   if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
   const data = (await res.json()) as Record<string, { usd: number; usd_24h_change: number }>;
