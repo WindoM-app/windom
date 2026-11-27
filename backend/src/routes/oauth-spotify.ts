@@ -4,7 +4,6 @@ import { authenticate } from '../middleware/authenticate.js';
 import {
   startSpotifyOAuthController,
   exchangeSpotifyOAuthController,
-  callbackSpotifyOAuthController,
 } from '../controllers/oauth-spotify.controller.js';
 
 export function oauthSpotifyRoutes(app: FastifyInstance): void {
@@ -15,5 +14,4 @@ export function oauthSpotifyRoutes(app: FastifyInstance): void {
 
   app.post('/start', { preHandler: authenticate }, startSpotifyOAuthController);
   app.post('/exchange', { preHandler: authenticate }, exchangeSpotifyOAuthController);
-  app.get('/callback', callbackSpotifyOAuthController);
 }

@@ -38,7 +38,7 @@ export async function updateMeController(req: FastifyRequest, reply: FastifyRepl
   }
 
   if (currentPassword !== undefined && newPassword !== undefined) {
-    const result = await meService.updatePassword(req.user.sub, currentPassword, newPassword);
+    const result = await meService.updatePassword(req.user.sub, currentPassword, newPassword, req.user.sid);
     if (result === 'no_password') {
       void reply
         .status(400)

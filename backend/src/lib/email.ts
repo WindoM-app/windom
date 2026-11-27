@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 import { logger } from './logger.js';
+import { escapeHtml } from './html.js';
 
 // ── Transporter (singleton) ────────────────────────────────────────────────
 
@@ -211,7 +212,7 @@ export async function sendVerificationEmail(to: string, name: string, token: str
     'Verify your WindoM email',
     buildEmail({
       preheader: 'One click to verify your email and get started with WindoM.',
-      heading: `Welcome${name ? `, ${name}` : ''} 👋`,
+      heading: `Welcome${name ? `, ${escapeHtml(name)}` : ''} 👋`,
       bodyLines: [
         'Thanks for creating a WindoM account. Before you get started, please verify your email address by clicking the button below.',
         'This link expires in <strong style="color:#e0e4f0;font-weight:600;">24 hours</strong>.',
@@ -232,7 +233,7 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
       preheader: 'Someone requested a password reset for your WindoM account.',
       heading: 'Reset your password',
       bodyLines: [
-        `Hi${name ? ` ${name}` : ''}, we received a request to reset the password for your WindoM account.`,
+        `Hi${name ? ` ${escapeHtml(name)}` : ''}, we received a request to reset the password for your WindoM account.`,
         'Click the button below to choose a new password. This link expires in <strong style="color:#e0e4f0;font-weight:600;">1 hour</strong>.',
       ],
       ctaLabel: 'Reset Password',
@@ -250,7 +251,7 @@ export async function sendGoogleOnlyResetEmail(to: string, name: string): Promis
       preheader: 'Your WindoM account uses Google sign-in - no password needed.',
       heading: 'No password on this account',
       bodyLines: [
-        `Hi${name ? ` ${name}` : ''}, your WindoM account was created with Google sign-in and doesn't have a separate password.`,
+        `Hi${name ? ` ${escapeHtml(name)}` : ''}, your WindoM account was created with Google sign-in and doesn't have a separate password.`,
         'Use the button below to sign in with your Google account instead.',
       ],
       ctaLabel: 'Sign in with Google',

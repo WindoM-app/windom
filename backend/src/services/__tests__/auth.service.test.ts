@@ -4,12 +4,14 @@ vi.mock('../../db/client.js', () => ({
   db: {
     select: vi.fn(),
     insert: vi.fn(),
+    transaction: vi.fn(),
   },
 }));
 
 vi.mock('../session.service.js', () => ({
   createSession: vi.fn().mockResolvedValue('raw-refresh-token'),
   findSessionByToken: vi.fn(),
+  findReusedSession: vi.fn().mockResolvedValue(null),
   rotateSessionAtomically: vi.fn().mockResolvedValue({ ok: true, rawRefreshToken: 'rotated-refresh-token' }),
   revokeSession: vi.fn().mockResolvedValue(undefined),
   revokeAllUserSessions: vi.fn().mockResolvedValue(undefined),

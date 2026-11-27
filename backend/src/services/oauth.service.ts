@@ -144,6 +144,7 @@ const googleTokenSchema = z.object({
 const googleUserInfoSchema = z.object({
   sub: z.string(),
   email: z.string(),
+  email_verified: z.union([z.boolean(), z.string()]).optional(),
   name: z.string().default(''),
 });
 

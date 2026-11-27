@@ -116,6 +116,38 @@ export async function findSessionByToken(rawToken: string): Promise<SessionRow |
   return valid ? session : null;
 }
 
+/**
+ * How long a just-rotated token is forgiven: tabs share one cookie, and a request
+ * already on its way can carry the old value.
+ */
+export const REUSE_GRACE_MS = 60_000;
+
+/**
+ * The session a replayed refresh token belonged to: it was rotated away a while ago
+ * and the chain that replaced it is still live, so two parties hold that chain.
+ * A token revoked any other way (sign-out, "end session") has no successor.
+ */
+export async function findReusedSession(rawToken: string, now = Date.now()): Promise<SessionRow | null> {
+  const [session] = await db
+    .select()
+    .from(refreshSessions)
+    .where(eq(refreshSessions.tokenLookup, sha256Hex(rawToken)))
+    .limit(1);
+
+  if (!session?.revokedAt || now - session.revokedAt.getTime() < REUSE_GRACE_MS) return null;
+  if (!(await bcrypt.compare(rawToken, session.tokenHash))) return null;
+
+  let latest: SessionRow | undefined;
+  for (let id = session.id, step = 0; step <= MAX_RENEWALS; step++) {
+    const [child] = await db.select().from(refreshSessions).where(eq(refreshSessions.rotatedFromId, id)).limit(1);
+    if (!child) break;
+    latest = child;
+    id = child.id;
+  }
+  const live = latest && latest.revokedAt === null && latest.expiresAt.getTime() > now;
+  return live ? session : null;
+}
+
 /** Check whether a session already has a rotated child (token reuse detection). */
 export async function hasChildSession(sessionId: string): Promise<boolean> {
   const [child] = await db

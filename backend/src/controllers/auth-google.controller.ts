@@ -42,6 +42,13 @@ async function handleGoogleCodeExchange(
   }
 
   const { userInfo } = exchangeResult.data;
+  // Sign-in matches accounts by address, so Google must vouch for it.
+  if (String(userInfo.email_verified) !== 'true') {
+    void reply
+      .status(403)
+      .send({ error: 'EMAIL_NOT_VERIFIED', message: 'Verify your email address with Google, then try again.' });
+    return;
+  }
   const tokens = await authService.loginWithGoogle(userInfo.email, userInfo.name, extractSessionMeta(req));
 
   reply.setCookie(COOKIE_NAME, tokens.rawRefreshToken, refreshCookieOptions);
@@ -107,26 +114,4 @@ export async function exchangeGoogleAuthController(req: FastifyRequest, reply: F
   }
 
   await handleGoogleCodeExchange(parsed.data.code, parsed.data.redirectUri, req, reply, parsed.data.codeVerifier);
-}
-
-export async function callbackGoogleAuthController(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { code, state, error } = req.query as Record<string, string>;
-
-  if (error || !code || !state) {
-    void reply.status(400).send({ error: error ?? 'invalid_callback' });
-    return;
-  }
-
-  if (!config.GOOGLE_REDIRECT_URI) {
-    void reply.status(500).send({ error: 'No redirect URI configured' });
-    return;
-  }
-
-  const stateResult = await oauthService.verifyAndConsumeOAuthState(state, 'google', 'login');
-  if (!stateResult.ok) {
-    void reply.status(400).send({ error: 'invalid_state' });
-    return;
-  }
-
-  await handleGoogleCodeExchange(code, config.GOOGLE_REDIRECT_URI, req, reply);
 }

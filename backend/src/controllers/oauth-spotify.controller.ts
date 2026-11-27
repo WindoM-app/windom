@@ -124,40 +124,19 @@ export async function exchangeSpotifyOAuthController(req: FastifyRequest, reply:
   }
 
   const stateResult = await oauthService.verifyAndConsumeOAuthState(parsed.data.state, 'spotify', 'link');
-  if (!stateResult.ok || !stateResult.data.userId) {
+  // Only the account that started the flow may finish it.
+  if (!stateResult.ok || stateResult.data.userId !== req.user.sub) {
     void reply.status(400).send({ error: 'Invalid or expired state' });
     return;
   }
 
   const pkceClientId = stateResult.data.clientId ?? undefined;
   await handleSpotifyCodeExchange(
-    stateResult.data.userId,
+    req.user.sub,
     parsed.data.code,
     parsed.data.redirectUri,
     reply,
     parsed.data.codeVerifier,
     pkceClientId,
   );
-}
-
-export async function callbackSpotifyOAuthController(req: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { code, state, error } = req.query as Record<string, string>;
-
-  if (error || !code || !state) {
-    void reply.status(400).send({ error: error ?? 'invalid_callback' });
-    return;
-  }
-
-  if (!config.SPOTIFY_REDIRECT_URI) {
-    void reply.status(500).send({ error: 'No redirect URI configured' });
-    return;
-  }
-
-  const stateResult = await oauthService.verifyAndConsumeOAuthState(state, 'spotify', 'link');
-  if (!stateResult.ok || !stateResult.data.userId) {
-    void reply.status(400).send({ error: 'invalid_state' });
-    return;
-  }
-
-  await handleSpotifyCodeExchange(stateResult.data.userId, code, config.SPOTIFY_REDIRECT_URI, reply);
 }

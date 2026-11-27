@@ -1,10 +1,17 @@
 import crypto from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { users } from '../db/schema.js';
+import { emailTokens, oauthAccounts, refreshSessions, userSettings, users } from '../db/schema.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { signAccessToken } from '../lib/jwt.js';
-import { createSession, findSessionByToken, revokeSession, rotateSessionAtomically } from './session.service.js';
+import {
+  createSession,
+  findReusedSession,
+  findSessionByToken,
+  revokeAllUserSessions,
+  revokeSession,
+  rotateSessionAtomically,
+} from './session.service.js';
 import { sendVerification } from './auth-email.service.js';
 import { logger } from '../lib/logger.js';
 import { EVENT_NAME_KEY, EVENT_TOKEN_REUSE, recordTokenReuse } from '../telemetry/events.js';
@@ -72,6 +79,16 @@ export async function login(email: string, password: string, meta: SessionMeta):
   return { ok: true, data: { accessToken, rawRefreshToken } };
 }
 
+async function reportTokenReuse(userId: string, sessionId: string, meta: SessionMeta): Promise<void> {
+  logger.error(
+    // The alert pages on `event.name` (#476). Only opaque ids: no email, IP or user agent.
+    { [EVENT_NAME_KEY]: EVENT_TOKEN_REUSE, sessionId, userId },
+    'refresh: TOKEN_REUSE_DETECTED - revoking ALL sessions for user',
+  );
+  recordTokenReuse();
+  await recordAudit('token_reuse_detected', { userId, sessionId, meta });
+}
+
 /**
  * Rotate a refresh token and issue a new access token.
  * Detects reuse and enforces the renewal cap.
@@ -79,6 +96,12 @@ export async function login(email: string, password: string, meta: SessionMeta):
 export async function refresh(rawToken: string, meta: SessionMeta): Promise<Result<TokenPair, AuthError>> {
   const session = await findSessionByToken(rawToken);
   if (!session) {
+    const reused = await findReusedSession(rawToken);
+    if (reused) {
+      await revokeAllUserSessions(reused.userId);
+      await reportTokenReuse(reused.userId, reused.id, meta);
+      return { ok: false, error: 'TOKEN_REUSE_DETECTED' };
+    }
     logger.warn('refresh: SESSION_NOT_FOUND - token revoked, expired, or invalid (may be a multi-tab race)');
     return { ok: false, error: 'SESSION_NOT_FOUND' };
   }
@@ -99,13 +122,7 @@ export async function refresh(rawToken: string, meta: SessionMeta): Promise<Resu
 
   if (!rotation.ok) {
     if (rotation.error === 'TOKEN_REUSE_DETECTED') {
-      logger.error(
-        // The alert pages on `event.name` (#476). Only opaque ids: no email, IP or user agent.
-        { [EVENT_NAME_KEY]: EVENT_TOKEN_REUSE, sessionId: session.id, userId: session.userId },
-        'refresh: TOKEN_REUSE_DETECTED - revoking ALL sessions for user',
-      );
-      recordTokenReuse();
-      await recordAudit('token_reuse_detected', { userId: session.userId, sessionId: session.id, meta });
+      await reportTokenReuse(session.userId, session.id, meta);
     } else {
       logger.warn({ sessionId: session.id }, `refresh: ${rotation.error}`);
     }
@@ -132,10 +149,32 @@ export async function logout(rawToken: string, meta?: SessionMeta): Promise<void
 }
 
 /**
+ * Hand an account whose address was never verified to the person who has now proved
+ * they own it. Whoever registered it may be someone else, so nothing they put there
+ * survives: password, sessions, mail tokens, connected accounts, name and settings.
+ */
+async function claimUnverifiedAccount(email: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(users)
+      .set({ passwordHash: null, emailVerified: true, name: '' })
+      .where(and(eq(users.email, email), eq(users.emailVerified, false)))
+      .returning({ id: users.id });
+    if (!claimed) return;
+    await tx.update(refreshSessions).set({ revokedAt: new Date() }).where(eq(refreshSessions.userId, claimed.id));
+    await tx.delete(emailTokens).where(eq(emailTokens.userId, claimed.id));
+    await tx.delete(oauthAccounts).where(eq(oauthAccounts.userId, claimed.id));
+    await tx.delete(userSettings).where(eq(userSettings.userId, claimed.id));
+  });
+}
+
+/**
  * Upsert a user from a Google OAuth sign-in and create a session.
  * Always succeeds - Google has already authenticated the user.
  */
 export async function loginWithGoogle(googleEmail: string, googleName: string, meta: SessionMeta): Promise<TokenPair> {
+  await claimUnverifiedAccount(googleEmail);
+
   // On conflict (existing account with same email): preserve the user's name if already set.
   // Only overwrite with Google name when the account has no name yet (empty string default).
   const [user] = await db
