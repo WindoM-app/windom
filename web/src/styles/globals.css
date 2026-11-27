@@ -12,6 +12,8 @@
    ============================================================ */
 :root,
 :host {
+  /* Native controls (colour, range, file, checkbox, autofill) draw dark too. */
+  color-scheme: dark;
   /* Keyboard focus ring: two-tone, because the wallpaper is any photograph
      the user picks. White alone vanishes on a white sky, dark alone on a night
      one. The white outline sits 2px out; the halo is a dark spread wider than

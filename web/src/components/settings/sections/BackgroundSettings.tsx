@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useBackgroundContext } from '../../../contexts/BackgroundContext';
@@ -10,6 +10,7 @@ import { BUNDLED_PHOTOS } from '../../../lib/bundled-photos';
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export function BackgroundSettings() {
+  const selectLabelId = useId();
   const { settings, update } = useSettings();
   const { addLocalPhoto, setFromPhoto, setUploadedBackground, photoHistory, unsplashError } = useBackgroundContext();
   const { unsplashHistory, localHistory, liked, toggleLike, deleteLocalPhoto } = photoHistory;
@@ -70,8 +71,11 @@ export function BackgroundSettings() {
     <div>
       {/* Source selector */}
       <div className="settings-group">
-        <label className="settings-label">Background Source:</label>
+        <label id={selectLabelId} className="settings-label">
+          Background Source:
+        </label>
         <GlassSelect
+          labelledBy={selectLabelId}
           value={settings.background.source}
           onChange={(value) => update('background', { source: value as 'unsplash' | 'local' })}
           options={[
@@ -100,6 +104,8 @@ export function BackgroundSettings() {
               type="text"
               defaultValue={settings.background.unsplashApiKey}
               placeholder="Paste your Access Key here"
+              spellCheck={false}
+              autoComplete="off"
               aria-label="Unsplash Access Key"
               onChange={(e) => update('background', { unsplashApiKey: e.target.value })}
               className="settings-input glass-input"

@@ -1,7 +1,9 @@
+import { useId } from 'react';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { GlassSelect } from '../../ui/GlassSelect';
 
 export function ClockSettings() {
+  const selectLabelId = useId();
   const { settings, update } = useSettings();
 
   const clockStyle = settings.clock.style;
@@ -14,15 +16,17 @@ export function ClockSettings() {
         <label className="settings-section-heading settings-label">Format</label>
 
         <label className="settings-label">Time Format</label>
-        <div className="segmented-control" style={{ marginBottom: 16 }}>
+        <div role="group" aria-label="Time Format" className="segmented-control" style={{ marginBottom: 16 }}>
           <button
             className={`segmented-btn${settings.clock.timeFormat === '12h' ? ' active' : ''}`}
+            aria-pressed={settings.clock.timeFormat === '12h'}
             onClick={() => update('clock', { timeFormat: '12h' })}
           >
             12-hour
           </button>
           <button
             className={`segmented-btn${settings.clock.timeFormat === '24h' ? ' active' : ''}`}
+            aria-pressed={settings.clock.timeFormat === '24h'}
             onClick={() => update('clock', { timeFormat: '24h' })}
           >
             24-hour
@@ -66,11 +70,12 @@ export function ClockSettings() {
         <label className="settings-section-heading settings-label">Appearance</label>
 
         <label className="settings-label">Style</label>
-        <div className="segmented-control" style={{ marginBottom: 16 }}>
+        <div role="group" aria-label="Style" className="segmented-control" style={{ marginBottom: 16 }}>
           {(['default', 'glass', 'outline'] as const).map((style) => (
             <button
               key={style}
               className={`segmented-btn${clockStyle === style ? ' active' : ''}`}
+              aria-pressed={clockStyle === style}
               onClick={() => update('clock', { style })}
             >
               {style.charAt(0).toUpperCase() + style.slice(1)}
@@ -104,11 +109,12 @@ export function ClockSettings() {
         />
 
         <label className="settings-label">Font Weight</label>
-        <div className="segmented-control">
+        <div role="group" aria-label="Font Weight" className="segmented-control">
           {([100, 200, 400, 600] as const).map((weight) => (
             <button
               key={weight}
               className={`segmented-btn${clockWeight === weight ? ' active' : ''}`}
+              aria-pressed={clockWeight === weight}
               onClick={() => update('clock', { weight })}
             >
               {weight === 100 ? 'Thin' : weight === 200 ? 'Light' : weight === 400 ? 'Regular' : 'Bold'}
@@ -139,8 +145,11 @@ export function ClockSettings() {
 
         {(settings.clock.showDate ?? false) && (
           <div style={{ marginTop: 12 }}>
-            <label className="settings-label">Date Format</label>
+            <label id={selectLabelId} className="settings-label">
+              Date Format
+            </label>
             <GlassSelect
+              labelledBy={selectLabelId}
               value={settings.clock.dateFormat ?? 'long'}
               onChange={(value) => update('clock', { dateFormat: value as 'long' | 'short' | 'numeric' })}
               options={[
