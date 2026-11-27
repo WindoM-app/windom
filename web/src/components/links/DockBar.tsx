@@ -218,6 +218,9 @@ export function DockBar() {
               id={urlId}
               className="dock-form-input glass-input"
               type="text"
+              inputMode="url"
+              spellCheck={false}
+              autoCapitalize="off"
               placeholder="https://..."
               aria-invalid={!!urlError}
               aria-describedby={urlError ? urlErrorId : undefined}
