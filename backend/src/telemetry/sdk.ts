@@ -155,6 +155,9 @@ export function createTelemetry(options: TelemetryOptions = {}): Telemetry {
 
   const sdk = new NodeSDK({
     resource: resources.resourceFromAttributes(buildResourceAttributes(env)),
+    // Explicit, because the SDK's default list can change between releases: adding
+    // `serviceInstanceIdDetector` replaces FLY_MACHINE_ID with a random UUID on every start.
+    resourceDetectors: [resources.envDetector, resources.processDetector, resources.hostDetector],
     spanProcessors: [spanProcessor],
     logRecordProcessors: [logProcessor],
     metricReaders: [metricReader],
