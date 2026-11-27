@@ -25,8 +25,9 @@ widgets.
 
 The search overlay opens with Ctrl+Cmd+H on whatever page the user is viewing,
 so the shortcut listener has to be present on every page. Until the shortcut is
-pressed the script only listens for it. It runs in the top frame only and does
-not read page content.
+pressed the script only listens for it. It runs in the top frame only. The one
+thing it reads from the page is the text direction; it does not read, store or
+send page content.
 
 ## Host permissions
 
