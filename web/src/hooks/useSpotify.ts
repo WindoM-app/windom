@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { apiGet, apiFetch } from '../lib/api';
 import { useSettingsSection } from '../contexts/SettingsContext';
 import { SPOTIFY_TICKER_INTERVAL_MS, SPOTIFY_CONTROL_REFETCH_DELAY_MS } from '../lib/timing-constants';
+import { startVisibleInterval } from '../lib/visible-interval';
 
 export interface SpotifyTrack {
   name: string;
@@ -25,7 +26,7 @@ export function useSpotify() {
   const spotifyConnected = integrations.spotify.connected;
   const [state, setState] = useState<NowPlayingState>({ isPlaying: false, progressMs: 0, track: null });
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPollRef = useRef<(() => void) | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Use refs so these helpers are always fresh inside useCallback closures
@@ -82,12 +83,12 @@ export function useSpotify() {
     }
 
     void fetchNowPlaying();
-    pollRef.current = setInterval(() => {
+    stopPollRef.current = startVisibleInterval(() => {
       void fetchNowPlaying();
     }, POLL_INTERVAL_MS);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPollRef.current?.();
       stopTicker();
     };
   }, [spotifyConnected, fetchNowPlaying, stopTicker]);

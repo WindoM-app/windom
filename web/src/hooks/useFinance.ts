@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { localStore } from '../lib/chrome-storage';
+import { startVisibleInterval } from '../lib/visible-interval';
 
 export interface StockQuote {
   symbol: string;
@@ -145,7 +146,7 @@ export function useFinance() {
   const [crypto, setCrypto] = useState<CryptoQuote[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopPollRef = useRef<(() => void) | null>(null);
   const prevTickersKey = useRef<string>('');
   const prevCryptoKey = useRef<string>('');
 
@@ -186,7 +187,6 @@ export function useFinance() {
       } finally {
         setLoading(false);
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [enabled, finance.showStocks, finance.showCrypto, tickersKey, cryptoKey],
   );
@@ -202,12 +202,12 @@ export function useFinance() {
     prevTickersKey.current = tickersKey;
     prevCryptoKey.current = cryptoKey;
     void fetchAll(watchlistChanged);
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
+    stopPollRef.current?.();
+    stopPollRef.current = startVisibleInterval(() => {
       void fetchAll(true);
     }, POLL_MS);
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      stopPollRef.current?.();
     };
   }, [enabled, fetchAll, tickersKey, cryptoKey]);
 
