@@ -2,7 +2,7 @@
    Design tokens - radius, spacing, ink, glass, motion, ...
 
    Declared on `:host` as well as `:root`: the content script
-   (src/content/index.tsx) injects this sheet into a shadow root,
+   (src/content/mount.tsx) injects this sheet into a shadow root,
    where `:root` matches nothing. Custom properties set on the
    shadow host inherit into the tree, so the search overlay on an
    ordinary web page resolves the same tokens as the new tab.

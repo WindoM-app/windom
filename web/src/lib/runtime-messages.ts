@@ -28,6 +28,35 @@ export function parseTabCommand(value: unknown): TabCommand | null {
   }
 }
 
+/**
+ * What the search overlay on a web page asks the worker for (#545). Focusing is
+ * the one command where the payload names the target tab: the user picked it
+ * from the worker's own answer, and all it can do is bring that tab forward.
+ */
+export type OverlayRequest =
+  | { type: 'WINDOM_CMD_SUGGEST' | 'WINDOM_CMD_QUERY_TABS'; query: string }
+  | { type: 'WINDOM_CMD_FOCUS_TAB'; tabId: number; windowId?: number };
+
+const MAX_QUERY_LENGTH = 512;
+
+export function parseOverlayRequest(value: unknown): OverlayRequest | null {
+  if (!isRecord(value)) return null;
+  switch (value.type) {
+    case 'WINDOM_CMD_SUGGEST':
+    case 'WINDOM_CMD_QUERY_TABS': {
+      // An empty query would match every tab, so it is refused rather than answered.
+      const { query } = value;
+      if (typeof query !== 'string' || !query.trim() || query.length > MAX_QUERY_LENGTH) return null;
+      return { type: value.type, query };
+    }
+    case 'WINDOM_CMD_FOCUS_TAB':
+      if (!isTabId(value.tabId)) return null;
+      return { type: value.type, tabId: value.tabId, windowId: isTabId(value.windowId) ? value.windowId : undefined };
+    default:
+      return null;
+  }
+}
+
 export type TabSnapshot = Pick<chrome.tabs.Tab, 'id' | 'windowId' | 'active' | 'title' | 'url' | 'favIconUrl'>;
 
 export function isTabId(value: unknown): value is number {

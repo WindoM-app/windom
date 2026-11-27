@@ -6,7 +6,7 @@ export function ContentApp() {
   return (
     <ContentSettingsProvider>
       <GlassFilters />
-      <SearchOverlay />
+      <SearchOverlay defaultOpen />
     </ContentSettingsProvider>
   );
 }

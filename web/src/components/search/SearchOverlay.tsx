@@ -20,18 +20,18 @@ import {
   OVERLAY_OPEN_FOCUS_DELAY_MS,
   OVERLAY_CLOSE_RESET_DELAY_MS,
   SUGGESTIONS_DEBOUNCE_MS,
-  SEARCH_API_TIMEOUT_MS,
 } from '../../lib/timing-constants';
 import { hasHistoryApi, hasHistoryPermission, searchHistory } from '../../lib/history-permission';
 import { hasChromeApi } from '../../lib/chrome-runtime';
+import { searchTerms } from '../../lib/search-suggest';
+import { isValidUrl } from '../../utils/url';
 import {
-  canQueryTabs,
   closeActiveTab,
   duplicateActiveTab,
   focusTab,
   openNewTab,
   openUrlInNewTab,
-  queryTabs,
+  searchOpenTabs,
   togglePinActiveTab,
 } from '../../lib/chrome-tabs';
 
@@ -148,30 +148,8 @@ function resolveAsUrl(input: string): string {
 // ── Suggestion fetchers ────────────────────────────────────────────────────────
 
 async function getTabSuggestions(q: string): Promise<Suggestion[]> {
-  try {
-    if (!canQueryTabs()) return [];
-    const lower = q.toLowerCase();
-    const tabs = await queryTabs();
-    return tabs
-      .filter((t) => {
-        if (t.url?.startsWith('chrome://') || t.url?.startsWith('chrome-extension://')) return false;
-        const urlMatch = t.url?.toLowerCase().includes(lower) ?? false;
-        const titleMatch = t.title?.toLowerCase().includes(lower) ?? false;
-        return urlMatch || titleMatch;
-      })
-      .slice(0, 3)
-      .map((t) => ({
-        kind: 'tab' as const,
-        text: t.title || t.url || '',
-        subtext: t.url,
-        url: t.url,
-        tabId: t.id,
-        windowId: t.windowId,
-        favicon: t.favIconUrl || undefined,
-      }));
-  } catch {
-    return [];
-  }
+  const tabs = await searchOpenTabs(q);
+  return tabs.map(({ title, ...tab }) => ({ kind: 'tab' as const, text: title, subtext: tab.url, ...tab }));
 }
 
 async function getHistorySuggestions(q: string, tabUrls: Set<string>, enabled: boolean): Promise<Suggestion[]> {
@@ -196,32 +174,17 @@ async function getHistorySuggestions(q: string, tabUrls: Set<string>, enabled: b
 }
 
 async function getSearchSuggestions(q: string): Promise<Suggestion[]> {
-  try {
-    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(q)}&type=list`, {
-      signal: AbortSignal.timeout(SEARCH_API_TIMEOUT_MS),
-    });
-    const data = (await res.json()) as unknown;
-
-    let terms: string[] = [];
-
-    if (Array.isArray(data) && Array.isArray((data as unknown[])[1])) {
-      terms = ((data as unknown[])[1] as unknown[]).filter((t): t is string => typeof t === 'string');
-    } else if (Array.isArray(data) && typeof (data as { phrase?: string }[])[0]?.phrase === 'string') {
-      terms = (data as { phrase: string }[]).map((d) => d.phrase).filter(Boolean);
-    }
-
-    return terms.slice(0, 5).map((term) => ({ kind: 'search' as const, text: term }));
-  } catch {
-    return [];
-  }
+  const terms = await searchTerms(q);
+  return terms.map((term) => ({ kind: 'search' as const, text: term }));
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function SearchOverlay() {
+/** `defaultOpen` is for the web-page overlay, which is first mounted by the shortcut itself. */
+export function SearchOverlay({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const { settings, update } = useSettings();
   const historyEnabled = settings.general.showHistory;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [value, setValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activeIdx, setActiveIdx] = useState(-1);
@@ -361,8 +324,10 @@ export function SearchOverlay() {
       const input = (overrideText ?? value).trim();
       if (!input) return;
       const url = suggestion?.url ?? resolveAsUrl(input);
-      window.location.href =
-        url || (ENGINES[settings.general.searchEngine] ?? ENGINES.google) + encodeURIComponent(input);
+      // Only web addresses are navigated to; anything else is searched for.
+      window.location.href = isValidUrl(url)
+        ? new URL(url).href
+        : (ENGINES[settings.general.searchEngine] ?? ENGINES.google) + encodeURIComponent(input);
       setOpen(false);
     },
     [value, settings.general.searchEngine],
