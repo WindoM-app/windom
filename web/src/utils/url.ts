@@ -3,6 +3,8 @@ export function isValidUrl(url: string): boolean {
   try {
     if (url.length > 2048) return false;
     const parsed = new URL(url);
+    // Chrome percent-encodes a space in a host instead of throwing, as Node does.
+    if (parsed.hostname.includes('%')) return false;
     return parsed.protocol === 'http:' || parsed.protocol === 'https:';
   } catch {
     return false;
