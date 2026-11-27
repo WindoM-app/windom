@@ -59,6 +59,12 @@ test('a dry run of an existing tag rehearses the tag, and does not require main'
   assert.deepEqual(r, { sha: A, dryRun: true, errors: [] });
 });
 
+test('a dry run from main refuses a tag that is not on main', () => {
+  const offMain = { ...dryRun, tag: 'v1.5.1', tagSha: A, tagOnMain: false, onMain: true };
+  assert.match(decideReleaseRef(offMain).errors[0], /not from main/);
+  assert.deepEqual(decideReleaseRef({ ...offMain, tagOnMain: true }).errors, []);
+});
+
 test('requires a tag', () => {
   assert.match(decideReleaseRef({ ...tagPush, tag: '' }).errors[0], /Missing release tag/);
   assert.match(decideReleaseRef({ ...tagPush, tag: undefined }).errors[0], /Missing release tag/);

@@ -168,8 +168,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
+          # No shared cache: this gate builds what ships.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci
@@ -255,8 +255,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+          # No shared cache: this gate builds what ships.
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci

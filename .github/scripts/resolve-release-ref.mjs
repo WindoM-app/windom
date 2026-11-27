@@ -45,8 +45,12 @@ const SHA_SHAPE = /^[0-9a-f]{40}$/;
  *   run even when the tag already exists. The scheduled rehearsal uses it: the
  *   version on main is usually already tagged, and what needs proving is the
  *   NEXT release - main's head - not the commit that already shipped.
+ * @param {boolean} [p.onMain]    the run itself is on main, so whatever it
+ *   checks out can write the caches that releases later read.
  */
-export function decideReleaseRef({ tag, tagSha, tagOnMain, refType, eventSha, requireTag, rehearseHead = false }) {
+export function decideReleaseRef({
+  tag, tagSha, tagOnMain, refType, eventSha, requireTag, rehearseHead = false, onMain = false,
+}) {
   const errors = [];
   const name = typeof tag === 'string' ? tag.trim().replace(/^refs\/tags\//, '') : '';
 
@@ -98,6 +102,12 @@ export function decideReleaseRef({ tag, tagSha, tagOnMain, refType, eventSha, re
     );
   }
 
+  // A rehearsal may check unmerged code, but not in main's scope: the gate runs
+  // that code's install and tests, which could poison the default branch cache.
+  if (!requireTag && onMain && !tagOnMain) {
+    errors.push(`Tag ${name} (${tagSha}) is not on main. Rehearse it from its own branch, not from main.`);
+  }
+
   return { sha: tagSha, dryRun: !requireTag, errors };
 }
 
@@ -129,6 +139,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     eventSha: process.env.GITHUB_SHA ?? '',
     requireTag,
     rehearseHead: process.env.REHEARSE_HEAD === 'true',
+    onMain: process.env.GITHUB_REF === 'refs/heads/main',
   });
 
   for (const error of errors) console.log(`::error::${error}`);
