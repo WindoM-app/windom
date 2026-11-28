@@ -13,13 +13,13 @@ widgets.
 
 ## Permission justifications
 
-| Permission | Justification |
-|---|---|
-| `storage` | Saves the user's settings, tasks and quick links, and syncs settings between the user's browsers. |
-| `unlimitedStorage` | Stores wallpapers the user uploads and cached images, which can exceed the default quota. |
-| `tabs` | Lists open tabs in the tab sidebar and in search, switches to the chosen tab, runs the search overlay's tab commands, and closes a duplicate WindoM new tab. |
-| `identity` | Runs the sign-in and account-connection windows for Google, Google Calendar and Spotify. |
-| `history` (optional) | Shows recently visited sites and history matches in search. Requested only when the user turns the History app on, and given back when it is turned off. |
+| Permission           | Justification                                                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `storage`            | Saves the user's settings, tasks and quick links, and syncs settings between the user's browsers.                                                                                                                         |
+| `unlimitedStorage`   | Stores wallpapers the user uploads and cached images, which can exceed the default quota.                                                                                                                                 |
+| `tabs`               | Lists open tabs in the tab sidebar and in search, switches to the chosen tab, runs the search overlay's tab commands, opens or switches to the Spotify web player from the player, and closes a duplicate WindoM new tab. |
+| `identity`           | Runs the sign-in and account-connection windows for Google, Google Calendar and Spotify.                                                                                                                                  |
+| `history` (optional) | Shows recently visited sites and history matches in search. Requested only when the user turns the History app on, and given back when it is turned off.                                                                  |
 
 ## Content script (`http://*/*`, `https://*/*`)
 
@@ -31,17 +31,17 @@ send page content.
 
 ## Host permissions
 
-| Host | Justification |
-|---|---|
-| `api.unsplash.com` | Fetches background photographs. |
-| `api.open-meteo.com` | Fetches the weather forecast. |
-| `geocoding-api.open-meteo.com` | Turns the city the user types into coordinates. |
-| `nominatim.openstreetmap.org` | Turns coordinates into a place name, after the user allows location. |
-| `ipapi.co` | Rough location when the user has allowed location but the browser cannot get a fix. |
-| `duckduckgo.com` | Search suggestions as the user types in the search box. |
-| `windom-api.fly.dev` | The WindoM server: optional account, settings sync and connected services. |
-| `query1.finance.yahoo.com` | Stock search and quotes for the user's watchlist. |
-| `api.coingecko.com` | Cryptocurrency prices for the user's watchlist. |
+| Host                           | Justification                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `api.unsplash.com`             | Fetches background photographs.                                                     |
+| `api.open-meteo.com`           | Fetches the weather forecast.                                                       |
+| `geocoding-api.open-meteo.com` | Turns the city the user types into coordinates.                                     |
+| `nominatim.openstreetmap.org`  | Turns coordinates into a place name, after the user allows location.                |
+| `ipapi.co`                     | Rough location when the user has allowed location but the browser cannot get a fix. |
+| `duckduckgo.com`               | Search suggestions as the user types in the search box.                             |
+| `windom-api.fly.dev`           | The WindoM server: optional account, settings sync and connected services.          |
+| `query1.finance.yahoo.com`     | Stock search and quotes for the user's watchlist.                                   |
+| `api.coingecko.com`            | Cryptocurrency prices for the user's watchlist.                                     |
 
 ## Data use disclosures
 

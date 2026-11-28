@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { buildTestApp } from '../../test-utils/app.js';
 import { truncateAll, closeDb } from '../../test-utils/db.js';
+import { db } from '../../db/client.js';
+import { refreshSessions, users } from '../../db/schema.js';
 
 const app = await buildTestApp();
 
@@ -118,6 +120,20 @@ describe('POST /auth/refresh', () => {
     const body = res.json<{ accessToken: string; refreshToken?: string }>();
     expect(typeof body.accessToken).toBe('string');
     expect(body.refreshToken).toBeUndefined();
+  });
+
+  it('tells the client when the session reached its renewal cap', async () => {
+    const cookie = (await register()).cookies.find((c) => c.name === 'windom_refresh');
+    await db.update(refreshSessions).set({ renewalCount: 1_000_000 });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/refresh',
+      cookies: { windom_refresh: cookie?.value ?? '' },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ code: 'SESSION_LIMIT_REACHED' });
   });
 
   it('returns 401 when no refresh cookie is present', async () => {
@@ -260,5 +276,33 @@ describe('DELETE /integrations/:provider', () => {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+// ── /me response shapes ───────────────────────────────────────────────────
+
+describe('/me response shapes', () => {
+  const bearer = async () => ({
+    authorization: `Bearer ${(await register()).json<{ accessToken: string }>().accessToken}`,
+  });
+
+  it('answers a password change with ok', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/me',
+      headers: await bearer(),
+      payload: { currentPassword: 'password123', newPassword: 'password456' },
+    });
+
+    expect(res.json()).toEqual({ ok: true });
+  });
+
+  it('keeps a missing email null', async () => {
+    const headers = await bearer();
+    await db.update(users).set({ email: null });
+
+    const res = await app.inject({ method: 'GET', url: '/me', headers });
+
+    expect(res.json()).toMatchObject({ email: null, name: 'Tester' });
   });
 });

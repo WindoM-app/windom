@@ -10,8 +10,16 @@ export const SEARCH_API_TIMEOUT_MS = 2000;
 export const QUOTE_FADE_DURATION_MS = 300;
 
 // Spotify
-export const SPOTIFY_CONTROL_REFETCH_DELAY_MS = 400;
 export const SPOTIFY_TICKER_INTERVAL_MS = 1000;
+export const SPOTIFY_POLL_INTERVAL_MS = 10_000;
+// Spotify takes a moment to report a command; re-read until it does.
+export const SPOTIFY_CONFIRM_DELAYS_MS = [500, 1000, 2000] as const;
+// Waiting for a newly opened web player to register as a device.
+export const SPOTIFY_DEVICE_RETRY_MS = 1500;
+export const SPOTIFY_DEVICE_ATTEMPTS = 10;
+export const SPOTIFY_STALE_MS = 3000;
+export const SPOTIFY_RATE_LIMIT_BACKOFF_MS = 60_000;
+export const SPOTIFY_COMMAND_ERROR_MS = 8000;
 
 // Clock / Greeting
 export const CLOCK_UPDATE_INTERVAL_MS = 1000;

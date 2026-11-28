@@ -38,18 +38,26 @@ export interface RefreshResult {
   accessToken: string;
   /** Lifetime of the new access token, in seconds (OAuth `expires_in`). */
   expiresInSec: number;
+  /** Set when the provider replaced the refresh token; the old one may no longer work. */
+  refreshToken?: string;
 }
 
 const standardTokenResponseSchema = z.object({
   access_token: z.string().min(1),
   expires_in: z.number().positive(),
+  refresh_token: z.string().min(1).optional(),
 });
 
 /** Parses an RFC 6749 section 5.1 token response; both Google and Spotify use it. */
 export function parseStandardTokenResponse(json: unknown): RefreshResult | null {
   const parsed = standardTokenResponseSchema.safeParse(json);
   if (!parsed.success) return null;
-  return { accessToken: parsed.data.access_token, expiresInSec: parsed.data.expires_in };
+  const { access_token, expires_in, refresh_token } = parsed.data;
+  return {
+    accessToken: access_token,
+    expiresInSec: expires_in,
+    ...(refresh_token ? { refreshToken: refresh_token } : {}),
+  };
 }
 
 /** grant_type and refresh_token first, then provider fields, in that order. */

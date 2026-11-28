@@ -1,149 +1,222 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { apiGet, apiFetch } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { useSettingsSection } from '../contexts/SettingsContext';
-import { SPOTIFY_TICKER_INTERVAL_MS, SPOTIFY_CONTROL_REFETCH_DELAY_MS } from '../lib/timing-constants';
+import {
+  SPOTIFY_TICKER_INTERVAL_MS,
+  SPOTIFY_POLL_INTERVAL_MS,
+  SPOTIFY_CONFIRM_DELAYS_MS,
+  SPOTIFY_DEVICE_RETRY_MS,
+  SPOTIFY_DEVICE_ATTEMPTS,
+  SPOTIFY_STALE_MS,
+  SPOTIFY_RATE_LIMIT_BACKOFF_MS,
+  SPOTIFY_COMMAND_ERROR_MS,
+} from '../lib/timing-constants';
 import { startVisibleInterval } from '../lib/visible-interval';
+import {
+  fetchNowPlaying,
+  openSpotifyWebPlayer,
+  sendPlaybackCommand,
+  type NowPlaying,
+  type PlaybackAction,
+  type SpotifyFailure,
+  type SpotifyResult,
+  type SpotifyTrack,
+} from '../lib/spotify-api';
 
-export interface SpotifyTrack {
-  name: string;
-  artist: string;
-  album: string;
-  albumArt: string | null;
-  durationMs: number;
-  url: string;
+export type { SpotifyTrack } from '../lib/spotify-api';
+
+export type SpotifyProblem =
+  | { kind: 'starting' }
+  | { kind: SpotifyFailure; source: 'poll' }
+  | { kind: SpotifyFailure; source: 'command'; at: number };
+
+const NOTHING: NowPlaying = { isPlaying: false, progressMs: 0, track: null };
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Whether what Spotify reports already shows the effect of `action`. */
+function reflects(action: PlaybackAction, before: NowPlaying, now: NowPlaying): boolean {
+  if (action === 'play') return now.isPlaying;
+  if (action === 'pause') return !now.isPlaying;
+  const changed = now.track?.url !== before.track?.url || now.track?.name !== before.track?.name;
+  // "Previous" restarts the same track when it is more than a few seconds in.
+  return changed || (action === 'previous' && now.progressMs < before.progressMs);
 }
 
-export interface NowPlayingState {
-  isPlaying: boolean;
-  progressMs: number;
-  track: SpotifyTrack | null;
+/** A poll that worked settles earlier problems, but not ones the user still has to act on. */
+function problemAfterPoll(problem: SpotifyProblem | null, data: NowPlaying): SpotifyProblem | null {
+  if (!problem || problem.kind === 'starting') return problem;
+  if (problem.source === 'poll') return null;
+  if (problem.kind === 'NO_DEVICE') return data.isPlaying ? null : problem;
+  return Date.now() - problem.at < SPOTIFY_COMMAND_ERROR_MS ? problem : null;
 }
-
-const POLL_INTERVAL_MS = 60_000;
 
 export function useSpotify() {
   const integrations = useSettingsSection('integrations');
   const spotifyConnected = integrations.spotify.connected;
-  const [state, setState] = useState<NowPlayingState>({ isPlaying: false, progressMs: 0, track: null });
-  const [error, setError] = useState<string | null>(null);
-  const stopPollRef = useRef<(() => void) | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [state, setState] = useState<NowPlaying>(NOTHING);
+  const [problem, setProblem] = useState<SpotifyProblem | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  // Use refs so these helpers are always fresh inside useCallback closures
-  const stopTicker = useCallback(() => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-  }, []);
-
-  const startTicker = useCallback((playing: boolean, duration: number) => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    if (!playing || duration <= 0) return;
-    tickRef.current = setInterval(() => {
-      setState((prev) => {
-        const next = Math.min(prev.progressMs + SPOTIFY_TICKER_INTERVAL_MS, duration);
-        if (next >= duration && tickRef.current) {
-          clearInterval(tickRef.current);
-          tickRef.current = null;
-        }
-        return { ...prev, progressMs: next };
-      });
-    }, SPOTIFY_TICKER_INTERVAL_MS);
-  }, []);
-
-  const fetchNowPlaying = useCallback(async () => {
-    try {
-      const data = await apiGet<NowPlayingState>('/spotify/now-playing');
-      setState(data);
-      setError(null);
-      startTicker(data.isPlaying, data.track?.durationMs ?? 0);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch';
-      // NO_DEVICE is a normal state (Spotify closed) - show friendly message, not error
-      if (msg.includes('No active') || msg.includes('NO_DEVICE') || msg.includes('422')) {
-        setState({ isPlaying: false, progressMs: 0, track: null });
-        setError('Open Spotify on a device to start playing');
-      } else {
-        setError(msg);
-      }
-      stopTicker();
-    }
-  }, [startTicker, stopTicker]);
-
+  const stateRef = useRef(state);
   useEffect(() => {
-    if (!spotifyConnected) {
-      setState({ isPlaying: false, progressMs: 0, track: null });
-      setError(null);
-      stopTicker();
+    stateRef.current = state;
+  }, [state]);
+
+  /** Bumped by every command and on teardown: answers to older questions are dropped. */
+  const epochRef = useRef(0);
+  const busyRef = useRef(false);
+  /** True from a command until Spotify reflects it, so a poll cannot undo the click. */
+  const settlingRef = useRef(false);
+  const polledAtRef = useRef(0);
+  const pollingRef = useRef(false);
+  const blockedUntilRef = useRef(0);
+  /** The reported position and when it was read; the progress bar counts from here. */
+  const anchorRef = useRef({ progressMs: 0, at: 0 });
+
+  const apply = useCallback((data: NowPlaying) => {
+    anchorRef.current = { progressMs: data.progressMs, at: Date.now() };
+    stateRef.current = data;
+    setState(data);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    if (pollingRef.current || settlingRef.current || Date.now() < blockedUntilRef.current) return;
+    pollingRef.current = true;
+    const epoch = epochRef.current;
+    const result = await fetchNowPlaying();
+    pollingRef.current = false;
+    if (epoch !== epochRef.current) return;
+    polledAtRef.current = Date.now();
+
+    if (result.ok) {
+      apply(result.data);
+      setProblem((p) => problemAfterPoll(p, result.data));
       return;
     }
+    if (result.failure === 'RATE_LIMITED') blockedUntilRef.current = Date.now() + SPOTIFY_RATE_LIMIT_BACKOFF_MS;
+    // Keep the last track on screen, but stop claiming it is advancing.
+    setState((prev) => ({ ...prev, isPlaying: false }));
+    setProblem({ kind: result.failure, source: 'poll' });
+  }, [apply]);
 
-    void fetchNowPlaying();
-    stopPollRef.current = startVisibleInterval(() => {
-      void fetchNowPlaying();
-    }, POLL_INTERVAL_MS);
+  /** For when the user is about to look at, or click, the player. */
+  const refreshIfStale = useCallback(() => {
+    if (Date.now() - polledAtRef.current > SPOTIFY_STALE_MS) void refresh();
+  }, [refresh]);
 
-    return () => {
-      stopPollRef.current?.();
-      stopTicker();
+  useEffect(() => {
+    if (!spotifyConnected) return;
+    void refresh();
+    const stopPolling = startVisibleInterval(() => void refresh(), SPOTIFY_POLL_INTERVAL_MS);
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshIfStale();
     };
-  }, [spotifyConnected, fetchNowPlaying, stopTicker]);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      epochRef.current += 1;
+      busyRef.current = false;
+      settlingRef.current = false;
+      pollingRef.current = false;
+      apply(NOTHING);
+      setProblem(null);
+      setBusy(false);
+    };
+  }, [spotifyConnected, refresh, refreshIfStale, apply]);
 
-  const control = useCallback(
-    async (action: 'play' | 'pause' | 'next' | 'previous') => {
-      // Optimistic update so the UI responds instantly before the re-fetch
-      if (action === 'pause') {
-        setState((prev) => ({ ...prev, isPlaying: false }));
-        stopTicker();
-      } else if (action === 'play') {
-        setState((prev) => ({ ...prev, isPlaying: true }));
-        // Ticker will be (re)started by the fetchNowPlaying below once duration is confirmed
+  const durationMs = state.track?.durationMs ?? 0;
+  useEffect(() => {
+    if (!state.isPlaying || durationMs <= 0) return;
+    const id = setInterval(() => {
+      const { progressMs, at } = anchorRef.current;
+      const next = Math.min(progressMs + (Date.now() - at), durationMs);
+      setState((prev) => ({ ...prev, progressMs: next }));
+      // The next track has started; do not wait for the next poll to show it.
+      if (next >= durationMs) void refresh();
+    }, SPOTIFY_TICKER_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [state.isPlaying, state.track?.url, durationMs, refresh]);
+
+  /** Opens the web player and retries until it shows up as a device. */
+  const playOnWebPlayer = useCallback(async (epoch: number): Promise<SpotifyResult<null>> => {
+    setProblem({ kind: 'starting' });
+    let result: SpotifyResult<null> = { ok: false, failure: 'NO_DEVICE' };
+    try {
+      await openSpotifyWebPlayer({ focus: false });
+    } catch {
+      return result;
+    }
+    for (let attempt = 0; attempt < SPOTIFY_DEVICE_ATTEMPTS; attempt += 1) {
+      await sleep(SPOTIFY_DEVICE_RETRY_MS);
+      if (epoch !== epochRef.current) break;
+      result = await sendPlaybackCommand('play');
+      if (result.ok || result.failure !== 'NO_DEVICE') break;
+    }
+    return result;
+  }, []);
+
+  const confirm = useCallback(
+    async (epoch: number, action: PlaybackAction, before: NowPlaying) => {
+      for (const [i, delay] of SPOTIFY_CONFIRM_DELAYS_MS.entries()) {
+        await sleep(delay);
+        if (epoch !== epochRef.current) return;
+        const result = await fetchNowPlaying();
+        if (epoch !== epochRef.current) return;
+        const last = i === SPOTIFY_CONFIRM_DELAYS_MS.length - 1;
+        if (!result.ok) continue;
+        const done = reflects(action, before, result.data);
+        if (!done && !last) continue;
+        apply(result.data);
+        // Accepted but silent: the browser can keep a background web player from
+        // starting audio until the user has been to its tab.
+        if (!done && action === 'play') setProblem({ kind: 'NO_DEVICE', source: 'command', at: Date.now() });
+        break;
       }
-
-      const res = await apiFetch(`/spotify/${action}`, { method: 'POST' }).catch((err: unknown) => {
-        console.error('[spotify] control fetch error:', err);
-        return null;
-      });
-
-      if (!res) {
-        setError('Network error - could not reach server');
-        return;
-      }
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          reason?: string;
-          spotifyStatus?: number;
-        };
-        if (res.status === 422 || body.error === 'NO_DEVICE') {
-          setError('Open Spotify on a device to control playback');
-        } else if (res.status === 401) {
-          setError('Session expired - sign in again via Settings → Account');
-        } else if (res.status === 403) {
-          setError('Spotify Premium required for playback control');
-        } else {
-          setError(`Control failed: ${body.error ?? 'unknown error'}`);
-        }
-        // Revert optimistic update on failure
-        if (action === 'pause') setState((prev) => ({ ...prev, isPlaying: true }));
-        if (action === 'play') setState((prev) => ({ ...prev, isPlaying: false }));
-        return;
-      }
-
-      // Re-fetch after short delay to confirm actual Spotify state
-      setTimeout(() => {
-        void fetchNowPlaying();
-      }, SPOTIFY_CONTROL_REFETCH_DELAY_MS);
+      settlingRef.current = false;
     },
-    [fetchNowPlaying, stopTicker],
+    [apply],
   );
 
-  return { ...state, spotifyConnected, error, control };
+  const control = useCallback(
+    async (action: PlaybackAction) => {
+      // One command at a time: a second click must not race the first.
+      if (busyRef.current) return;
+      busyRef.current = true;
+      settlingRef.current = true;
+      const epoch = ++epochRef.current;
+      const before = stateRef.current;
+      setBusy(true);
+      setProblem(null);
+      // Show the effect of play and pause at once.
+      if (action === 'play' || action === 'pause') apply({ ...before, isPlaying: action === 'play' });
+
+      let result = await sendPlaybackCommand(action);
+      if (epoch === epochRef.current && !result.ok && result.failure === 'NO_DEVICE' && action === 'play') {
+        result = await playOnWebPlayer(epoch);
+      }
+      if (epoch !== epochRef.current) return;
+      busyRef.current = false;
+      setBusy(false);
+
+      if (!result.ok) {
+        settlingRef.current = false;
+        apply(before);
+        setProblem({ kind: result.failure, source: 'command', at: Date.now() });
+        // The click may have failed because the screen was out of date.
+        void refresh();
+        return;
+      }
+      setProblem(null);
+      await confirm(epoch, action, before);
+    },
+    [apply, confirm, playOnWebPlayer, refresh],
+  );
+
+  const openSpotify = useCallback(() => void openSpotifyWebPlayer({ focus: true }), []);
+
+  return { ...state, spotifyConnected, problem, busy, control, openSpotify, refreshIfStale };
 }
 
 export function useSpotifyTopTracks() {

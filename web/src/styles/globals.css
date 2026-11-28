@@ -4099,80 +4099,6 @@ body.focus-exiting .sidebar-container {
 /* ============================================================
    Spotify Now Playing Widget
    ============================================================ */
-.spotify-widget {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: var(--r-card);
-}
-.spotify-widget-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.spotify-progress-bar {
-  height: 3px;
-  border-radius: var(--r-xs);
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-}
-.spotify-progress-fill {
-  height: 100%;
-  border-radius: var(--r-xs);
-  background: #1db954;
-  transition: width 0.5s linear;
-}
-.spotify-track-link {
-  flex: 1;
-  min-width: 0;
-  text-decoration: none;
-  color: inherit;
-}
-.spotify-track-link:hover .spotify-track-name {
-  text-decoration: underline;
-}
-.spotify-nothing-playing {
-  opacity: 0.5;
-  font-style: italic;
-}
-.spotify-album-art {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-inner);
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.spotify-album-art-placeholder {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-inner);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.spotify-track-info {
-  flex: 1;
-  min-width: 0;
-}
-.spotify-track-name {
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.spotify-track-artist {
-  font-size: 12px;
-  opacity: 0.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 2px;
-}
 .spotify-eq {
   display: flex;
   align-items: flex-end;
@@ -4224,12 +4150,6 @@ body.focus-exiting .sidebar-container {
 }
 
 /* Error state inside widget (settings sidebar) */
-.spotify-widget-error {
-  margin-top: 6px;
-  font-size: 11px;
-  color: rgba(255, 160, 120, 0.85);
-  line-height: 1.4;
-}
 
 /* ============================================================
    Spotify Dock (top-right, same style as quick-links dock)
@@ -4409,6 +4329,33 @@ body.focus-exiting .sidebar-container {
 }
 .spotify-dock-eq-overlay .spotify-eq-bar {
   height: 7px;
+}
+
+a.spotify-dock-track-name {
+  display: block;
+  text-decoration: none;
+}
+a.spotify-dock-track-name:hover {
+  text-decoration: underline;
+}
+.spotify-dock-disc-btn[aria-disabled='true'],
+.spotify-dock-ctrl[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.6;
+}
+.spotify-dock-action {
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand-spotify);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Error message shown in the dock info area */

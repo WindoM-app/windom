@@ -18,12 +18,24 @@ type RefreshError = Extract<
 // awaits the first refresh rather than triggering a parallel token rotation race.
 const inflight = new Map<string, Promise<Result<string, RefreshError>>>();
 
+async function isInvalidGrant(res: Response): Promise<boolean> {
+  const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  return body?.error === 'invalid_grant';
+}
+
+/** The stored access token, if the row's refresh token changed since `account` was read. */
+async function readRefreshedByAnother(account: OAuthAccountRow): Promise<string | null> {
+  const [row] = await db.select().from(oauthAccounts).where(eq(oauthAccounts.id, account.id)).limit(1);
+  if (!row || row.refreshTokenEnc === account.refreshTokenEnc) return null;
+  return decryptToken(row.accessTokenEnc);
+}
+
 /**
  * Refresh the account's access token with the provider's strategy and persist it.
  * Provider-agnostic: everything that differs per provider comes from `strategy`.
  *
  * Error codes:
- * - TOKEN_REFRESH_REVOKED: provider returned 401/403 - user must re-authorize
+ * - TOKEN_REFRESH_REVOKED: provider returned 401/403 or `invalid_grant` - user must re-authorize
  * - TOKEN_REFRESH_NETWORK_ERROR: network/5xx failure - transient, safe to retry
  * - TOKEN_REFRESH_FAILED: malformed provider response, missing refresh token,
  *   or a provider whose credential cannot be refreshed
@@ -49,8 +61,15 @@ async function doRefresh(
   }
 
   if (!res.ok) {
-    // 401/403 means the refresh token is revoked or expired - user must re-authorize.
-    // 5xx or other codes are transient provider errors - safe to retry later.
+    // 401/403, or 400 `invalid_grant` (RFC 6749 section 5.2), means the refresh
+    // token is revoked or expired - user must re-authorize. 5xx or other codes
+    // are transient provider errors - safe to retry later.
+    if (res.status === 400 && (await isInvalidGrant(res))) {
+      // Another machine may have refreshed first and been given a new refresh
+      // token, which makes the one used here invalid but not the connection.
+      const winner = await readRefreshedByAnother(account);
+      return winner ? { ok: true, data: winner } : { ok: false, error: 'TOKEN_REFRESH_REVOKED' };
+    }
     return {
       ok: false,
       error: res.status === 401 || res.status === 403 ? 'TOKEN_REFRESH_REVOKED' : 'TOKEN_REFRESH_NETWORK_ERROR',
@@ -60,13 +79,14 @@ async function doRefresh(
   const parsed = strategy.parseResponse(await res.json());
   if (!parsed) return { ok: false, error: 'TOKEN_REFRESH_FAILED' };
 
-  const { accessToken, expiresInSec } = parsed;
+  const { accessToken, expiresInSec, refreshToken: rotated } = parsed;
+  const newRefresh = rotated ? { refreshTokenEnc: await encryptToken(rotated) } : {};
   const newAccessEnc = await encryptToken(accessToken);
   const newExpiry = new Date(Date.now() + expiresInSec * 1000);
 
   await db
     .update(oauthAccounts)
-    .set({ accessTokenEnc: newAccessEnc, tokenExpiresAt: newExpiry, updatedAt: new Date() })
+    .set({ accessTokenEnc: newAccessEnc, ...newRefresh, tokenExpiresAt: newExpiry, updatedAt: new Date() })
     .where(eq(oauthAccounts.id, account.id));
 
   return { ok: true, data: accessToken };

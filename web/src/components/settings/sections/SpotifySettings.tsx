@@ -19,6 +19,7 @@ function SpotifyIcon({ size = 20 }: { size?: number }) {
 
 function NoClientIdState({ onSaved }: { onSaved: () => void }) {
   const { user } = useAuth();
+  const alreadyLinked = useSettings().settings.integrations.spotify.connected;
   const [clientIdInput, setClientIdInput] = useState('');
   const [copied, setCopied] = useState(false);
   const { busy, error, setError, connect } = useSpotifyConnection({ afterConnect: onSaved, saveClientId: true });
@@ -44,6 +45,11 @@ function NoClientIdState({ onSaved }: { onSaved: () => void }) {
         <p className="settings-hint" style={{ marginBottom: '16px', lineHeight: '1.6' }}>
           Connect your own free Spotify Developer app - no shared quota, works for everyone.
         </p>
+        {alreadyLinked && (
+          <p className="settings-hint" style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+            Your account is already linked to Spotify. To reconnect from this browser, enter the same Client ID.
+          </p>
+        )}
 
         <ol style={{ paddingLeft: '18px', margin: '0 0 16px', lineHeight: '1.7' }} className="settings-hint">
           <li>
@@ -176,7 +182,7 @@ function SavedNotConnectedState({
 
 function ConnectedState({ clientId, onDisconnected }: { clientId: string; onDisconnected: () => void }) {
   const { settings, update } = useSettings();
-  const { busy, error, disconnect } = useSpotifyConnection({ afterDisconnect: onDisconnected });
+  const { busy, error, connect, disconnect } = useSpotifyConnection({ afterDisconnect: onDisconnected });
   const showTopTracks = settings.integrations.spotify.showTopTracks;
 
   return (
@@ -195,8 +201,25 @@ function ConnectedState({ clientId, onDisconnected }: { clientId: string; onDisc
         </button>
       </div>
       {error && <p className="integration-error">{error}</p>}
-      <p className="settings-hint" style={{ marginTop: '8px', opacity: 0.6 }}>
+      <p className="settings-hint" style={{ marginTop: '8px' }}>
         App: <code style={{ fontSize: '12px' }}>{clientId.slice(0, 8)}…</code>
+        {clientId && (
+          <>
+            {' '}
+            <button
+              type="button"
+              className="auth-required-link"
+              style={{ fontSize: '12px' }}
+              disabled={busy}
+              onClick={() => void connect(clientId)}
+            >
+              Reconnect
+            </button>
+          </>
+        )}
+      </p>
+      <p className="settings-hint" style={{ marginTop: '4px' }}>
+        Spotify ends access after six months. Reconnect when the player says you are signed out.
       </p>
 
       <div className="settings-group" style={{ marginTop: '16px' }}>

@@ -7,6 +7,33 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+Spotify fixes. The server and the extension both change; no schema migrations.
+Deploying the server alone restores "now playing" for installed extensions.
+
+### Fixed
+- **Now playing was always empty.** The server removed the track from its own
+  reply, so the player showed "Nothing playing" whatever was playing.
+- Play and pause no longer need a second click. One command runs at a time, an
+  older reply cannot undo it, and the player re-reads until Spotify reports the
+  change. The player also checks every 10 seconds, and when a track ends.
+- With Spotify closed everywhere, play opens the web player in a background tab
+  and starts there; an idle device is woken. If that does not start, an "Open
+  Spotify" button brings the tab forward.
+- Expired Spotify access now says so and offers **Reconnect**. A replacement
+  token sent by Spotify is kept, and linking a second Spotify account uses the
+  newest one.
+- Podcasts show their title and show. Adverts and local files no longer break
+  the player. Premium, rate-limit and device restrictions each have their own
+  message, and pausing what is already paused is not an error.
+- The player shows the artist and links to the track.
+- The player works again in a tab left open for a long time.
+- A sign-in that reaches its time limit now says that, instead of signing out
+  without a reason.
+
+---
+
 ## [1.8.2] - 2026-11-28
 
 A security and bug-fix release for the extension and the server. No schema

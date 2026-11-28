@@ -2,6 +2,16 @@ import type { FastifyInstance } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 
+export const userProperties = {
+  id: { type: 'string', format: 'uuid' },
+  // Null for an account with no address; a plain 'string' would send ''.
+  email: { type: ['string', 'null'], format: 'email' },
+  name: { type: 'string' },
+  emailVerified: { type: 'boolean' },
+  hasPassword: { type: 'boolean' },
+  createdAt: { type: 'string', format: 'date-time' },
+};
+
 export async function registerSwagger(app: FastifyInstance, isDev: boolean): Promise<void> {
   // Register shared schemas in Fastify's schema store so route serializers can resolve $ref.
   app.addSchema({
@@ -11,6 +21,8 @@ export async function registerSwagger(app: FastifyInstance, isDev: boolean): Pro
       statusCode: { type: 'integer' },
       error: { type: 'string' },
       message: { type: 'string' },
+      /** Machine-readable reason, where a client has to tell failures apart. */
+      code: { type: 'string' },
     },
   });
   app.addSchema({
@@ -21,18 +33,7 @@ export async function registerSwagger(app: FastifyInstance, isDev: boolean): Pro
       accessToken: { type: 'string' },
     },
   });
-  app.addSchema({
-    $id: 'User',
-    type: 'object',
-    properties: {
-      id: { type: 'string', format: 'uuid' },
-      email: { type: 'string', format: 'email' },
-      name: { type: 'string' },
-      emailVerified: { type: 'boolean' },
-      hasPassword: { type: 'boolean' },
-      createdAt: { type: 'string', format: 'date-time' },
-    },
-  });
+  app.addSchema({ $id: 'User', type: 'object', properties: userProperties });
 
   await app.register(swagger, {
     openapi: {
