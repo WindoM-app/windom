@@ -7,10 +7,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.8.3] - 2026-11-28
 
-Spotify fixes. The server and the extension both change; no schema migrations.
-Deploying the server alone restores "now playing" for installed extensions.
+Spotify and settings-sync fixes. The server and the extension both change; no
+schema migrations. No permission changes. Deploying the server alone restores
+"now playing" for installed extensions.
 
 ### Fixed
 - **Now playing was always empty.** The server removed the track from its own
