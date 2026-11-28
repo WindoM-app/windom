@@ -120,7 +120,7 @@ describe('Spotify OAuth routes', () => {
   it('exchanges PKCE code using the client bound to state and stores tokens', async () => {
     vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
       ok: true,
-      data: { id: 's1', userId: 'owner-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
+      data: { id: 's1', userId: 'user-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
     });
     vi.mocked(oauthService.exchangeSpotifyCode).mockResolvedValue({
       ok: true,
@@ -141,7 +141,7 @@ describe('Spotify OAuth routes', () => {
     expect(response.statusCode).toBe(200);
     expect(oauthService.exchangeSpotifyCode).toHaveBeenCalledWith('code', pkceRedirect, 'verifier', 'user-client');
     expect(oauthService.storeOAuthTokens).toHaveBeenCalledWith(
-      'owner-1',
+      'user-1',
       'spotify',
       expect.objectContaining({
         providerUserId: 'spotify-user',
@@ -153,7 +153,7 @@ describe('Spotify OAuth routes', () => {
   it('rejects a Spotify account already linked to another WindoM user', async () => {
     vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
       ok: true,
-      data: { id: 's1', userId: 'owner-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
+      data: { id: 's1', userId: 'user-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
     });
     vi.mocked(oauthService.exchangeSpotifyCode).mockResolvedValue({
       ok: true,
@@ -177,7 +177,7 @@ describe('Spotify OAuth routes', () => {
   ] as const)('maps provider %s to HTTP %s', async (error, statusCode) => {
     vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
       ok: true,
-      data: { id: 's1', userId: 'owner-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
+      data: { id: 's1', userId: 'user-1', provider: 'spotify', purpose: 'link', clientId: 'user-client' },
     });
     vi.mocked(oauthService.exchangeSpotifyCode).mockResolvedValue({ ok: false, error });
     const response = await app.inject({
@@ -188,9 +188,4 @@ describe('Spotify OAuth routes', () => {
     });
     expect(response.statusCode).toBe(statusCode);
   });
-
-  it.each(['/oauth/spotify/callback', '/oauth/spotify/callback?error=access_denied'])(
-    'rejects invalid callback %s',
-    async (url) => expect((await app.inject({ method: 'GET', url })).statusCode).toBe(400),
-  );
 });

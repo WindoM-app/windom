@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { users } from '../db/schema.js';
-import { revokeAllUserSessions } from './session.service.js';
+import { emailTokens, users } from '../db/schema.js';
+import { revokeAllUserSessions, revokeOtherSessions } from './session.service.js';
 import { loadRevocableAccounts, revokeAccounts } from './provider-revoke.service.js';
 import type { UserRecord } from '../types/auth.types.js';
 
@@ -43,6 +43,7 @@ export async function updatePassword(
   userId: string,
   currentPassword: string,
   newPassword: string,
+  currentSessionId?: string,
 ): Promise<'ok' | 'wrong_password' | 'no_password'> {
   const hash = await getUserPasswordHash(userId);
   if (!hash) return 'no_password';
@@ -53,6 +54,12 @@ export async function updatePassword(
 
   const newHash = await hashPassword(newPassword);
   await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
+  // Whoever else knew the old password is signed out, and a pending reset link dies.
+  await db
+    .delete(emailTokens)
+    .where(and(eq(emailTokens.userId, userId), eq(emailTokens.type, 'password_reset'), isNull(emailTokens.usedAt)));
+  if (currentSessionId) await revokeOtherSessions(userId, currentSessionId);
+  else await revokeAllUserSessions(userId);
   return 'ok';
 }
 

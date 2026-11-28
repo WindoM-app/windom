@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, lt } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { auditLogs, type AuditAction } from '../db/schema.js';
+import { auditLogs, emailTokens, oauthStates, type AuditAction } from '../db/schema.js';
 import { parseDeviceLabel } from '../lib/device-label.js';
 import { logger } from '../lib/logger.js';
 import { purgeStaleSessions } from './session.service.js';
@@ -62,7 +62,16 @@ export async function recordAudit(action: AuditAction, entry: AuditEntry): Promi
     } catch (err: unknown) {
       logger.error({ err }, 'session: stale purge failed');
     }
+    await purgeSpentTokens().catch((err: unknown) => {
+      logger.error({ err }, 'tokens: purge failed');
+    });
   }
+}
+
+/** Delete OAuth states and mail tokens past their expiry; neither can be redeemed again. */
+export async function purgeSpentTokens(now = new Date()): Promise<void> {
+  await db.delete(oauthStates).where(lt(oauthStates.expiresAt, now));
+  await db.delete(emailTokens).where(lt(emailTokens.expiresAt, now));
 }
 
 /** Delete audit rows older than the retention window. Returns how many were removed. */

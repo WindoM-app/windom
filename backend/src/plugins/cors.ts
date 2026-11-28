@@ -29,7 +29,8 @@ export async function registerCors(app: FastifyInstance): Promise<void> {
         return cb(null, true);
       }
 
-      cb(new Error(`CORS: origin not allowed`), false);
+      // The caller's mistake, so a 4xx: it must not raise the server-error alert.
+      cb(Object.assign(new Error('CORS: origin not allowed'), { statusCode: 403 }), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

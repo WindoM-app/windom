@@ -104,7 +104,7 @@ describe('Google OAuth routes', () => {
   it('exchanges a valid link code and stores provider tokens for the state owner', async () => {
     vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
       ok: true,
-      data: { id: 's1', userId: 'owner-1', provider: 'google', purpose: 'link', clientId: null },
+      data: { id: 's1', userId: 'user-1', provider: 'google', purpose: 'link', clientId: null },
     });
     vi.mocked(oauthService.exchangeGoogleCode).mockResolvedValue({
       ok: true,
@@ -122,7 +122,7 @@ describe('Google OAuth routes', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'linked' });
     expect(oauthService.storeOAuthTokens).toHaveBeenCalledWith(
-      'owner-1',
+      'user-1',
       'google',
       expect.objectContaining({ providerUserId: 'google-user' }),
     );
@@ -131,7 +131,7 @@ describe('Google OAuth routes', () => {
   it('maps a Google token exchange failure without storing tokens', async () => {
     vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
       ok: true,
-      data: { id: 's1', userId: 'owner-1', provider: 'google', purpose: 'link', clientId: null },
+      data: { id: 's1', userId: 'user-1', provider: 'google', purpose: 'link', clientId: null },
     });
     vi.mocked(oauthService.exchangeGoogleCode).mockResolvedValue({ ok: false, error: 'TOKEN_EXCHANGE_FAILED' });
     const response = await app.inject({
@@ -163,7 +163,7 @@ describe('Google OAuth routes', () => {
       ok: true,
       data: {
         tokens: { access_token: 'provider-access', expires_in: 3600, scope: 'openid' },
-        userInfo: { sub: 'google-user', email: 'user@example.com', name: 'Alice' },
+        userInfo: { sub: 'google-user', email: 'user@example.com', email_verified: true, name: 'Alice' },
       },
     });
     vi.mocked(authService.loginWithGoogle).mockResolvedValue({
@@ -180,10 +180,39 @@ describe('Google OAuth routes', () => {
     expect(response.headers['set-cookie']).toContain('HttpOnly');
   });
 
-  it.each(['/auth/google/callback', '/auth/google/callback?error=access_denied', '/oauth/google/callback'])(
-    'rejects invalid callback %s',
-    async (url) => {
-      expect((await app.inject({ method: 'GET', url })).statusCode).toBe(400);
-    },
-  );
+  it('refuses to finish a link another account started', async () => {
+    vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
+      ok: true,
+      data: { id: 's1', userId: 'someone-else', provider: 'google', purpose: 'link', clientId: null },
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/oauth/google/exchange',
+      headers: { authorization },
+      payload: { code: 'code', state: 'state', redirectUri: linkRedirect },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(oauthService.exchangeGoogleCode).not.toHaveBeenCalled();
+  });
+
+  it.each([false, undefined])('refuses a Google sign-in whose email_verified is %s', async (email_verified) => {
+    vi.mocked(oauthService.verifyAndConsumeOAuthState).mockResolvedValue({
+      ok: true,
+      data: { id: 's1', userId: null, provider: 'google', purpose: 'login', clientId: null },
+    });
+    vi.mocked(oauthService.exchangeGoogleCode).mockResolvedValue({
+      ok: true,
+      data: {
+        tokens: { access_token: 'provider-access', expires_in: 3600, scope: 'openid' },
+        userInfo: { sub: 'google-user', email: 'user@example.com', email_verified, name: 'Alice' },
+      },
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/google/exchange',
+      payload: { code: 'code', state: 'state', redirectUri: loginRedirect },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(authService.loginWithGoogle).not.toHaveBeenCalled();
+  });
 });

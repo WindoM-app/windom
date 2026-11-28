@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import * as authEmailService from '../services/auth-email.service.js';
 import { extractSessionMeta } from '../lib/request.js';
+import { escapeHtml } from '../lib/html.js';
 
 // ── Shared page shell ──────────────────────────────────────────────────────
 // Full glass-morphism page: animated gradient blobs + backdrop-filter card.
@@ -223,16 +224,6 @@ function buildPage(opts: { title: string; body: string }): string {
 
 // ── Page bodies ────────────────────────────────────────────────────────────
 
-/** Escape characters that are special in HTML attribute values. */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 function resetFormBody(token: string): string {
   return `
     <h1>Reset your password</h1>
@@ -337,6 +328,9 @@ export async function forgotPasswordController(req: FastifyRequest, reply: Fasti
 }
 
 export function resetPasswordPageController(req: FastifyRequest, reply: FastifyReply): void {
+  // Helmet's `no-referrer` makes browsers post this form with `Origin: null`, which CORS
+  // refuses. `same-origin` sends the real origin and still tells other sites nothing.
+  void reply.header('Referrer-Policy', 'same-origin');
   const { token } = req.query as { token?: string };
   if (!token) {
     void reply
