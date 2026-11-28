@@ -1,0 +1,11 @@
+// Cloudflare Workers (static assets only) for the Spotify player page in player/.
+// Deployed by Cloudflare's Git integration; see player/README.md.
+{
+  "name": "windom-player",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./player" },
+  "routes": [{ "pattern": "player.windom.app", "custom_domain": true }],
+  // Served from the custom domain only.
+  "workers_dev": false,
+  "preview_urls": false
+}
