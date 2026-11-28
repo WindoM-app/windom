@@ -504,7 +504,7 @@ jobs:
         if: env.WEBSITE_DISPATCH_TOKEN != ''
         env:
           GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
-        run: gh workflow run deploy-site.yml -R WindoM-app/website --ref main"
+        run: gh workflow run deploy-site.yml -R WindoM-app/website --ref main
       - name: No token configured
         if: env.WEBSITE_DISPATCH_TOKEN == ''
         run: echo "::notice::WEBSITE_DISPATCH_TOKEN is not set; windom.app will pick this release up on its nightly build."

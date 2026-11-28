@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 /**
  * A job that checks out the gate's commit (`ref: ${{ needs.gate.outputs.sha }}`)
@@ -47,6 +48,23 @@ test("jobs on the gate commit run release scripts from the workflow ref", () => 
         !/sparse-checkout/.test(line)
       ) {
         offenders.push(`${job.name}: ${line.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+// v1.8.2's website notification failed on a stray quote, in a step that only a
+// real release runs. One-line `run:` commands can be parsed without running them.
+test("one-line run commands in workflows parse as shell", () => {
+  const dir = new URL("../workflows/", import.meta.url);
+  const offenders = [];
+  for (const file of readdirSync(dir)) {
+    const text = readFileSync(new URL(file, dir), "utf8");
+    // Block scalars (`|`, `>`) and quoted YAML strings are not covered.
+    for (const [, command] of text.matchAll(/^ *(?:- )?run: +([^|>"'\s].*)$/gm)) {
+      if (spawnSync("bash", ["-n", "-c", command]).status !== 0) {
+        offenders.push(`${file}: ${command}`);
       }
     }
   }
