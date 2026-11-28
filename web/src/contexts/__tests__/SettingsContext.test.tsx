@@ -247,6 +247,29 @@ describe('windom-auth-login', () => {
     );
   });
 
+  it('keeps provider keys the account copy does not have', async () => {
+    vi.mocked(syncStorage.getMultiple).mockResolvedValue({
+      ...defaultSettings,
+      integrations: { ...defaultSettings.integrations, spotify: { connected: false, showTopTracks: true } },
+    } as never);
+    await mountAndWait();
+    vi.mocked(getAccessToken).mockResolvedValue('token');
+    vi.mocked(apiGet).mockResolvedValue({ data: { integrations: { spotify: { connected: true } } }, updatedAt: 5 });
+    vi.mocked(syncStorage.setMultiple).mockClear();
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('windom-auth-login', { detail: { name: 'Alice', restore: false } }));
+    });
+
+    await waitFor(() =>
+      expect(syncStorage.setMultiple).toHaveBeenCalledWith(
+        expect.objectContaining({
+          integrations: expect.objectContaining({ spotify: { connected: true, showTopTracks: true } }),
+        }),
+      ),
+    );
+  });
+
   it('takes the account copy on a sign-in', async () => {
     await loginWithDirtyEdit(false);
     await waitFor(() =>

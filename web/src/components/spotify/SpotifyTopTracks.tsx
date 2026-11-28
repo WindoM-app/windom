@@ -1,4 +1,5 @@
 import { useSpotifyTopTracks } from '../../hooks/useSpotify';
+import { SpotifyLogo } from './SpotifyLogo';
 
 export function SpotifyTopTracks() {
   const { tracks } = useSpotifyTopTracks();
@@ -7,7 +8,10 @@ export function SpotifyTopTracks() {
 
   return (
     <div className="spotify-top-tracks">
-      <div className="spotify-top-tracks-title">Top Tracks</div>
+      <div className="spotify-top-tracks-title">
+        <SpotifyLogo />
+        <span>Top Tracks</span>
+      </div>
       <div className="spotify-top-tracks-list">
         {tracks.map((track, i) => (
           <a key={track.url} href={track.url} target="_blank" rel="noreferrer" className="spotify-top-track-item">

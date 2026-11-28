@@ -29,6 +29,21 @@ import { SYNC_EXCLUDE, pickSyncable, pickSections, type SetSettings } from '../l
 import { stripSecrets, stripSectionSecrets } from '../lib/secret-settings';
 import { createLogger } from '../lib/logger';
 
+/**
+ * One section of the server copy over the local one. `integrations` holds one object
+ * per provider, merged one level deeper: a server copy that lacks some of a provider's
+ * keys (saved by an older server or extension) must not erase them here.
+ */
+function mergeSection(section: keyof Settings, local: object, remote: object): object {
+  const merged: Record<string, unknown> = { ...local, ...remote };
+  if (section === 'integrations') {
+    for (const [provider, fields] of Object.entries(remote)) {
+      merged[provider] = { ...(local as Record<string, object>)[provider], ...(fields as object) };
+    }
+  }
+  return merged;
+}
+
 const log = createLogger('settings');
 
 const PUSH_DEBOUNCE_MS = 5000;
@@ -152,10 +167,11 @@ export function useSettingsBackendSync(
           if (sectionVal && typeof sectionVal === 'object' && sectionKey in merged) {
             const k = sectionKey as keyof Settings;
             if (!SYNC_EXCLUDE.has(k) && !keepLocal.has(sectionKey)) {
-              (merged as unknown as Record<string, unknown>)[k] = {
-                ...(localSettings as unknown as Record<string, object>)[k],
-                ...(sectionVal as object),
-              };
+              (merged as unknown as Record<string, unknown>)[k] = mergeSection(
+                k,
+                (localSettings as unknown as Record<string, object>)[k],
+                sectionVal,
+              );
             }
           }
         }

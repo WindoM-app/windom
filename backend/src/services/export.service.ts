@@ -119,12 +119,12 @@ export const EXPORT_POLICY = {
  * settings validator accepts must appear in exactly one of the two lists (export-policy.test.ts).
  */
 export const SETTINGS_EXPORTED: Readonly<Record<string, readonly string[]>> = {
-  general: ['userName', 'searchEngine', 'sidebarSide', 'showGreeting'],
+  general: ['userName', 'searchEngine', 'sidebarSide', 'showGreeting', 'showHistory', 'showTodo'],
   clock: ['timeFormat', 'showSeconds', 'leadingZero', 'style', 'color', 'size', 'weight', 'showDate', 'dateFormat'],
   background: ['source', 'unsplashCollectionId'],
   weather: ['show', 'unit', 'location'],
   widgets: ['showLinks', 'showFocus', 'showQuotes', 'quoteSource', 'quickLinks'],
-  integrations: ['calendar', 'spotify', 'gmail'],
+  integrations: ['calendar', 'spotify', 'gmail', 'finance', 'github'],
 };
 
 export const SETTINGS_WITHHELD: Readonly<Record<string, readonly string[]>> = {

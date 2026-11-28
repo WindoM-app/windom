@@ -724,8 +724,6 @@ input[type='checkbox']::before {
 /* Reduced motion (2.3.3, 2.2.2): no looping or entrance movement. */
 @media (prefers-reduced-motion: reduce) {
   .app-loader-spinner,
-  .spotify-eq-bar,
-  .spotify-dock-disc.spinning,
   .search-overlay-dropdown,
   .onboarding-backdrop,
   .onboarding-modal,

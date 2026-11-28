@@ -3,6 +3,7 @@ import { useSpotify, type SpotifyProblem } from '../../hooks/useSpotify';
 import { useLiquidGlass } from '../../hooks/useLiquidGlass';
 import { SPOTIFY_FAILURES } from '../../lib/spotify-api';
 import { SETTINGS_EVENT } from '../../lib/settings-events';
+import { SpotifyLogo } from './SpotifyLogo';
 
 export function SpotifyPlayer() {
   const glassRef = useLiquidGlass<HTMLDivElement>('dock');
@@ -35,35 +36,30 @@ export function SpotifyPlayer() {
       onMouseLeave={() => setHovered(false)}
       onFocus={refreshIfStale}
     >
-      {/* Disc button - always visible, anchored to left. aria-disabled, so focus stays put. */}
+      <a
+        className="spotify-dock-logo"
+        href={track?.url || 'https://open.spotify.com'}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Open Spotify"
+        title="Open Spotify"
+      >
+        <SpotifyLogo />
+      </a>
+      {/* Always visible. aria-disabled, so focus stays put. */}
       <button
         type="button"
-        className="spotify-dock-disc-btn"
+        className="spotify-dock-ctrl spotify-dock-toggle"
         onClick={() => void control(isPlaying ? 'pause' : 'play')}
         title={`${toggleLabel} · ${nowPlaying}`}
         aria-label={toggleLabel}
         aria-busy={busy}
         aria-disabled={busy}
       >
-        <div className={`spotify-dock-disc${isPlaying ? ' spinning' : ''}`}>
-          {track?.albumArt ? (
-            <img src={track.albumArt} alt="" className="spotify-dock-art" />
-          ) : (
-            <div className="spotify-dock-art-placeholder">
-              <NoteIcon />
-            </div>
-          )}
-        </div>
-        {isPlaying && (
-          <div className="spotify-dock-eq-overlay">
-            <span className="spotify-eq-bar" />
-            <span className="spotify-eq-bar" />
-            <span className="spotify-eq-bar" />
-          </div>
-        )}
+        {isPlaying ? <PauseIcon /> : <PlayIcon />}
       </button>
 
-      {/* Expandable right panel - hidden until hover */}
+      {/* Expandable panel - hidden until hover or focus */}
       <div className="spotify-dock-expand">
         <div className="spotify-dock-expand-inner">
           <button
@@ -86,6 +82,8 @@ export function SpotifyPlayer() {
           >
             <NextIcon />
           </button>
+          {/* Cover art stays as Spotify supplies it: square, still and uncovered. */}
+          {track?.albumArt && <img src={track.albumArt} alt="" className="spotify-dock-art" />}
           <div className="spotify-dock-info">
             <div role="status">
               {problem ? (
@@ -144,20 +142,19 @@ function ProblemLine({ problem, onOpenSpotify }: { problem: SpotifyProblem; onOp
   );
 }
 
-function NoteIcon() {
+function PlayIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="rgba(255,255,255,0.5)"
-      strokeWidth="2"
-      strokeLinecap="round"
-    >
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <polygon points="6,4 20,12 6,20" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
     </svg>
   );
 }
