@@ -291,3 +291,21 @@ describe('session events', () => {
     expect(result.current.sessionExpired).toBe(false);
   });
 });
+
+// ── session renewal cap ──────────────────────────────────────────────────────
+
+describe('session renewal cap', () => {
+  it('is still explained after the logout that follows it', async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.authLoading).toBe(false));
+    const onLogout = vi.mocked(setLogoutCallback).mock.lastCall![0];
+
+    // apiFetch dispatches the event during the refresh, then calls the callback.
+    act(() => {
+      window.dispatchEvent(new CustomEvent('windom-session-limit'));
+      onLogout();
+    });
+
+    expect(result.current.sessionLimitReached).toBe(true);
+  });
+});

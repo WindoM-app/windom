@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await purgeLegacyRefreshToken();
     setUser(null);
     setTokenState(null);
+    setSessionLimitReached(false);
   }, []);
 
   // Register the logout callback so apiFetch can trigger it on 401
@@ -67,7 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void purgeLegacyRefreshToken();
       setUser(null);
       setTokenState(null);
-      setSessionLimitReached(false);
     });
   }, []);
 
@@ -83,10 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('windom-session-expired', handler);
   }, []);
 
-  // Listen for session limit reached - too many active sessions
+  // Listen for the session renewal cap being reached
   useEffect(() => {
     const handler = () => {
-      log.warn('Session limit reached - user must sign out from another device');
+      log.warn('Session renewal cap reached - user must sign in again');
       setUser(null);
       setTokenState(null);
       setSessionLimitReached(true);

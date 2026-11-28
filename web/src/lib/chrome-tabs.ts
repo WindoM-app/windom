@@ -59,6 +59,20 @@ export function createTab(url?: string): void {
   chrome.tabs.create(url === undefined ? {} : { url });
 }
 
+/**
+ * Makes sure a tab matching `pattern` exists, opening `url` if none does. With
+ * `focus` the tab is brought forward; otherwise the user stays where they are.
+ */
+export async function ensureTab(url: string, pattern: string, focus: boolean): Promise<void> {
+  if (!canQueryTabs()) {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+  const [existing] = await queryTabs({ url: pattern });
+  if (existing?.id === undefined) await chrome.tabs.create({ url, active: focus });
+  else if (focus) focusTab(existing.id, existing.windowId);
+}
+
 async function activeTab(): Promise<chrome.tabs.Tab | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;

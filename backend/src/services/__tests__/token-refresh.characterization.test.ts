@@ -34,6 +34,8 @@ import { GOOGLE_TOKEN_URL, SPOTIFY_TOKEN_URL } from '../../types/constants.js';
 import { getCalendarEvents, clearCalendarCacheForTest } from '../calendar.service.js';
 import { getGmailSummary, clearGmailCacheForTest } from '../gmail.service.js';
 import { getNowPlaying, clearNowPlayingCacheForTest } from '../spotify.service.js';
+import { getValidAccessToken } from '../token-refresh.service.js';
+import { spotifyPkceRefreshStrategy } from '../token-refresh.strategies.js';
 
 const FORM = 'application/x-www-form-urlencoded';
 const SPOTIFY_BASIC = `Basic ${Buffer.from('spotify-client-id:spotify-client-secret').toString('base64')}`;
@@ -251,6 +253,61 @@ describe.each(PROVIDERS)('provider token refresh characterization: $name', (p) =
     expect(calls).toHaveLength(1);
     expect(result).toEqual({ ok: false, error });
     expect(await readRow(row.id)).toEqual(row);
+  });
+
+  it('maps 400 invalid_grant to revoked', async () => {
+    const { userId, row } = await seed({
+      provider: p.provider,
+      expiresAt: EXPIRED(),
+      scopes: p.scopes,
+      providerClientId: p.providerClientId,
+    });
+    stubFetch({ status: 400, json: { error: 'invalid_grant' } });
+
+    expect(await p.call(userId)).toEqual({ ok: false, error: 'TOKEN_REFRESH_REVOKED' });
+    expect(await readRow(row.id)).toEqual(row);
+  });
+
+  it('stores a replacement refresh token', async () => {
+    const { userId, row } = await seed({
+      provider: p.provider,
+      expiresAt: EXPIRED(),
+      scopes: p.scopes,
+      providerClientId: p.providerClientId,
+    });
+    stubFetch({ status: 200, json: { access_token: 'fresh-access', expires_in: 3600, refresh_token: 'rotated' } });
+
+    await p.call(userId);
+
+    const updated = await readRow(row.id);
+    expect(await decryptToken(updated.refreshTokenEnc!)).toBe('rotated');
+  });
+
+  it('uses the other refresh when one beat this one to a replacement token', async () => {
+    const { row } = await seed({
+      provider: p.provider,
+      expiresAt: EXPIRED(),
+      scopes: p.scopes,
+      providerClientId: p.providerClientId,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        // Another machine writes its result while this request is in flight.
+        await db
+          .update(oauthAccounts)
+          .set({
+            accessTokenEnc: await encryptToken('their-access'),
+            refreshTokenEnc: await encryptToken('their-refresh'),
+          })
+          .where(eq(oauthAccounts.id, row.id));
+        return new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 });
+      }),
+    );
+
+    const result = await getValidAccessToken(row, spotifyPkceRefreshStrategy('client'));
+
+    expect(result).toEqual({ ok: true, data: 'their-access' });
   });
 
   it('fails with TOKEN_REFRESH_FAILED and no network call when no refresh token is stored', async () => {

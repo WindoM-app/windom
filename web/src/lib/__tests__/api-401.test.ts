@@ -63,6 +63,30 @@ describe('a 401 from a provider route', () => {
   });
 });
 
+describe('a 401 from a provider route with no token to send', () => {
+  it('is our session, so it refreshes and retries', async () => {
+    // A tab left open past the access token's lifetime sends nothing.
+    let stored: Record<string, unknown> = {};
+    vi.mocked(chrome.storage.local.get).mockImplementation(async () => stored as never);
+    vi.mocked(chrome.storage.local.set).mockImplementation(async (items) => {
+      stored = { ...stored, ...(items as Record<string, unknown>) };
+    });
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/auth/refresh')) {
+        return new Response(JSON.stringify({ accessToken: token }), { status: 200 });
+      }
+      const authorised = 'Authorization' in ((init?.headers ?? {}) as Record<string, string>);
+      return new Response('{}', { status: authorised ? 200 : 401 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await apiFetch('/spotify/now-playing');
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('a rate-limited refresh', () => {
   it('keeps the session rather than logging out', async () => {
     // Our own route 401s, so a refresh is correct here - but it comes back 429.

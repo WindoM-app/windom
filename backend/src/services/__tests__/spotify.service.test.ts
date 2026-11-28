@@ -16,7 +16,9 @@ const mockGetToken = getValidAccessToken as ReturnType<typeof vi.fn>;
 function dbReturnsAccount(account: Record<string, unknown> | null): void {
   const limitMock = vi.fn().mockResolvedValue(account ? [account] : []);
   mockDb.select.mockReturnValue({
-    from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: limitMock }) }),
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({ orderBy: vi.fn().mockReturnValue({ limit: limitMock }) }),
+    }),
   });
 }
 
@@ -332,5 +334,166 @@ describe('a playback command and the now-playing cache', () => {
 
     expect(command.ok).toBe(false);
     if (!command.ok) expect(command.error).toBe('NO_DEVICE');
+  });
+});
+
+// ── Failures a user can act on ─────────────────────────────────────────────
+
+type Reply = [status: number, body?: unknown];
+
+/** Answers by "METHOD path", and records the calls made. */
+function spotifyApi(replies: Record<string, Reply | Reply[]>): string[] {
+  const calls: string[] = [];
+  const seen: Record<string, number> = {};
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init: RequestInit = {}) => {
+      const key = `${init.method ?? 'GET'} ${new URL(url).pathname.replace('/v1', '')}`;
+      calls.push(init.body ? `${key} ${init.body as string}` : key);
+      const entry = replies[key];
+      if (!entry) return Promise.reject(new Error(`unexpected fetch: ${key}`));
+      const list = (Array.isArray(entry[0]) ? entry : [entry]) as Reply[];
+      const n = seen[key] ?? 0;
+      seen[key] = n + 1;
+      const [status, body] = list[Math.min(n, list.length - 1)];
+      return Promise.resolve(new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status }));
+    }),
+  );
+  return calls;
+}
+
+const active: Reply = [200, { is_playing: true, device: { id: 'dev-1', is_active: true } }];
+const noPlayer: Reply = [204];
+
+describe('playback on real-world device states', () => {
+  beforeEach(() => {
+    dbReturnsAccount({ id: 'acct-1' });
+    mockGetToken.mockResolvedValue({ ok: true, data: 'token' });
+  });
+
+  it('transfers playback to an idle device when play finds none active', async () => {
+    const calls = spotifyApi({
+      'GET /me/player': noPlayer,
+      'GET /me/player/devices': [200, { devices: [{ id: 'web', is_active: false }] }],
+      'PUT /me/player': [204],
+    });
+
+    expect((await sendPlaybackCommand('user-1', 'play')).ok).toBe(true);
+    expect(calls).toContain('PUT /me/player {"device_ids":["web"],"play":true}');
+  });
+
+  it('skips restricted devices and devices without an id', async () => {
+    const calls = spotifyApi({
+      'GET /me/player': noPlayer,
+      'GET /me/player/devices': [200, { devices: [{ id: null }, { id: 'tv', is_restricted: true }] }],
+    });
+
+    expect(await sendPlaybackCommand('user-1', 'play')).toEqual({ ok: false, error: 'RESTRICTED' });
+    expect(calls).toHaveLength(2);
+  });
+
+  it('reports NO_DEVICE when the device disappears before the command', async () => {
+    spotifyApi({ 'GET /me/player': active, 'POST /me/player/next': [404] });
+
+    expect(await sendPlaybackCommand('user-1', 'next')).toEqual({ ok: false, error: 'NO_DEVICE' });
+  });
+
+  it('treats pausing an already paused player as done', async () => {
+    spotifyApi({
+      'GET /me/player': [active, [200, { is_playing: false, device: { id: 'dev-1' } }]],
+      'PUT /me/player/pause': [403, { error: { message: 'Player command failed: Restriction violated' } }],
+    });
+
+    expect((await sendPlaybackCommand('user-1', 'pause')).ok).toBe(true);
+  });
+
+  it('keeps a restriction as an error when the state does not match', async () => {
+    spotifyApi({
+      'GET /me/player': active,
+      'PUT /me/player/pause': [403, { error: { message: 'Player command failed: Restriction violated' } }],
+    });
+
+    expect(await sendPlaybackCommand('user-1', 'pause')).toEqual({ ok: false, error: 'RESTRICTED' });
+  });
+
+  it('tells a missing Premium subscription apart', async () => {
+    spotifyApi({
+      'GET /me/player': active,
+      'PUT /me/player/play': [403, { error: { reason: 'PREMIUM_REQUIRED' } }],
+    });
+
+    expect(await sendPlaybackCommand('user-1', 'play')).toEqual({ ok: false, error: 'PREMIUM_REQUIRED' });
+  });
+
+  it.each([
+    [401, 'TOKEN_REFRESH_REVOKED'],
+    [429, 'RATE_LIMITED'],
+    [500, 'API_ERROR'],
+  ] as const)('maps a %i from the device list', async (status, error) => {
+    spotifyApi({ 'GET /me/player': noPlayer, 'GET /me/player/devices': [status] });
+
+    expect(await sendPlaybackCommand('user-1', 'play')).toEqual({ ok: false, error });
+  });
+
+  it('answers API_ERROR rather than throwing when Spotify is unreachable', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    expect(await sendPlaybackCommand('user-1', 'play')).toEqual({ ok: false, error: 'API_ERROR' });
+    expect(await getNowPlaying('user-1')).toEqual({ ok: false, error: 'API_ERROR' });
+  });
+});
+
+describe('what is playing', () => {
+  beforeEach(() => {
+    dbReturnsAccount({ id: 'acct-1' });
+    mockGetToken.mockResolvedValue({ ok: true, data: 'token' });
+  });
+
+  it('shows a podcast episode under its show', async () => {
+    spotifyApi({
+      'GET /me/player/currently-playing': [
+        200,
+        {
+          is_playing: true,
+          progress_ms: 5,
+          item: { type: 'episode', name: 'Ep 1', show: { name: 'The Show' }, images: [{ url: 'i' }], duration_ms: 9 },
+        },
+      ],
+    });
+
+    const result = await getNowPlaying('user-1');
+
+    expect(result.ok && result.data.track).toMatchObject({ name: 'Ep 1', artist: 'The Show', albumArt: 'i', url: '' });
+  });
+
+  it('copes with a local file, which has no link or artwork', async () => {
+    const item = { ...rawTrack, external_urls: {}, album: { name: '', images: [] } };
+    spotifyApi({ 'GET /me/player/currently-playing': [200, { is_playing: true, progress_ms: 0, item }] });
+
+    const result = await getNowPlaying('user-1');
+
+    expect(result.ok && result.data.track).toMatchObject({ url: '', albumArt: null });
+  });
+
+  it('says an advert is playing even though it has no track', async () => {
+    spotifyApi({ 'GET /me/player/currently-playing': [200, { is_playing: true, item: null }] });
+
+    expect(await getNowPlaying('user-1')).toEqual({ ok: true, data: { isPlaying: true, track: null } });
+  });
+
+  it('does not keep what it reads while a command is settling', async () => {
+    const body = (name: string): Reply => [200, { is_playing: true, progress_ms: 0, item: { ...rawTrack, name } }];
+    spotifyApi({
+      'GET /me/player': active,
+      'POST /me/player/next': [204],
+      // Spotify still reports the old track on the first read after the command.
+      'GET /me/player/currently-playing': [body('Old'), body('New')],
+    });
+
+    await sendPlaybackCommand('user-1', 'next');
+    await getNowPlaying('user-1');
+    const second = await getNowPlaying('user-1');
+
+    expect(second.ok && second.data.track?.name).toBe('New');
   });
 });

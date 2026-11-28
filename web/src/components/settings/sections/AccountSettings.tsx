@@ -246,7 +246,7 @@ export function AccountSettings() {
     return (
       <div className="settings-group">
         <p className="auth-error" style={{ marginBottom: '12px' }}>
-          You've reached the maximum number of active sessions. Please sign out from another device to continue.
+          This sign-in has reached its time limit. Sign in again to continue.
         </p>
         <SignedOutView />
       </div>

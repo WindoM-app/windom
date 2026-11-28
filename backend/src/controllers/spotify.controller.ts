@@ -3,22 +3,62 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import * as spotifyService from '../services/spotify.service.js';
 import type { PlaybackCommand } from '../services/spotify.service.js';
 
+interface ErrorReply {
+  status: number;
+  error: string;
+  message: string;
+  code: string;
+}
+
+const RECONNECT: ErrorReply = {
+  status: 401,
+  error: 'Unauthorized',
+  message: 'Spotify access has expired. Reconnect Spotify in Settings.',
+  code: 'RECONNECT_REQUIRED',
+};
+
+const API_ERROR: ErrorReply = { status: 502, error: 'Bad Gateway', message: 'Spotify API error', code: 'API_ERROR' };
+
+/** What the client is told for each failure. `code` is what it branches on. */
+const ERROR_REPLIES: Partial<Record<spotifyService.SpotifyError, ErrorReply>> = {
+  NOT_CONNECTED: { status: 404, error: 'Not Found', message: 'Spotify not connected', code: 'NOT_CONNECTED' },
+  NO_DEVICE: {
+    status: 422,
+    error: 'No Active Device',
+    message: 'Open Spotify on any device to enable playback control',
+    code: 'NO_DEVICE',
+  },
+  PREMIUM_REQUIRED: {
+    status: 403,
+    error: 'Forbidden',
+    message: 'Spotify Premium is required for playback control',
+    code: 'PREMIUM_REQUIRED',
+  },
+  FORBIDDEN: {
+    status: 403,
+    error: 'Forbidden',
+    message: 'Spotify refused the request. Check that your account is allowed to use your Spotify app.',
+    code: 'FORBIDDEN',
+  },
+  RESTRICTED: {
+    status: 409,
+    error: 'Conflict',
+    message: 'Spotify does not allow that on this device right now',
+    code: 'RESTRICTED',
+  },
+  RATE_LIMITED: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Spotify is rate limiting requests. Try again shortly.',
+    code: 'RATE_LIMITED',
+  },
+  TOKEN_REFRESH_REVOKED: RECONNECT,
+  TOKEN_REFRESH_FAILED: RECONNECT,
+};
+
 function sendSpotifyError(error: spotifyService.SpotifyError, reply: FastifyReply): void {
-  if (error === 'NOT_CONNECTED') {
-    void reply.status(404).send({ statusCode: 404, error: 'Not Found', message: 'Spotify not connected' });
-  } else if (error === 'NO_DEVICE') {
-    void reply.status(422).send({
-      statusCode: 422,
-      error: 'No Active Device',
-      message: 'Open Spotify on any device to enable playback control',
-    });
-  } else if (error === 'FORBIDDEN') {
-    void reply
-      .status(403)
-      .send({ statusCode: 403, error: 'Forbidden', message: 'Spotify premium required or action not allowed' });
-  } else {
-    void reply.status(502).send({ statusCode: 502, error: 'Bad Gateway', message: 'Spotify API error' });
-  }
+  const { status, ...body } = ERROR_REPLIES[error] ?? API_ERROR;
+  void reply.status(status).send({ statusCode: status, ...body });
 }
 
 export async function getNowPlayingController(req: FastifyRequest, reply: FastifyReply): Promise<void> {

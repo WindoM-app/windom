@@ -56,11 +56,18 @@ export function SettingsPanel() {
       setActiveTab('weather');
       setIsOpen(true);
     };
+    const spotifyHandler = () => {
+      setActiveTab('apps');
+      setOpenAppId('spotify');
+      setIsOpen(true);
+    };
+    document.addEventListener(SETTINGS_EVENT.OPEN_SPOTIFY, spotifyHandler);
     document.addEventListener(SETTINGS_EVENT.TOGGLE, toggleHandler);
     document.addEventListener(SETTINGS_EVENT.CLOSE, closeHandler);
     document.addEventListener(SETTINGS_EVENT.OPEN_ACCOUNT, accountHandler);
     document.addEventListener(SETTINGS_EVENT.OPEN_WEATHER, weatherHandler);
     return () => {
+      document.removeEventListener(SETTINGS_EVENT.OPEN_SPOTIFY, spotifyHandler);
       document.removeEventListener(SETTINGS_EVENT.TOGGLE, toggleHandler);
       document.removeEventListener(SETTINGS_EVENT.CLOSE, closeHandler);
       document.removeEventListener(SETTINGS_EVENT.OPEN_ACCOUNT, accountHandler);

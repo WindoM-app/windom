@@ -4,4 +4,5 @@ export const SETTINGS_EVENT = {
   CLOSE: 'close-settings',
   OPEN_ACCOUNT: 'open-settings-account',
   OPEN_WEATHER: 'open-settings-weather',
+  OPEN_SPOTIFY: 'open-settings-spotify',
 } as const;

@@ -291,7 +291,9 @@ export async function apiFetch(path: string, options: RequestInit = {}, _retry =
     // Discriminated by route rather than by whether our own token looks valid:
     // a session revoked server-side still parses as valid, and that case must
     // keep its refresh-then-logout path.
-    if (isProviderRoute(path)) {
+    // With no token sent (it had expired in a long-open tab) the 401 is ours
+    // whatever the route, and only a refresh can fix it.
+    if (token && isProviderRoute(path)) {
       log.debug(`401 on ${path} - provider token, not a session problem`);
       return res;
     }

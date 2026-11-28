@@ -10,6 +10,7 @@ import {
   revokeOtherSessionsController,
   listActivityController,
 } from '../controllers/me.controller.js';
+import { userProperties } from '../plugins/swagger.js';
 
 const security = [{ bearerAuth: [] }];
 const errorResponse = { $ref: 'Error#' };
@@ -204,7 +205,11 @@ export function meRoutes(app: FastifyInstance): void {
         summary: 'Update user name - accepts { name?: string }',
         security,
         response: {
-          200: { $ref: 'User#' },
+          // A name change answers with the user, a password change with `ok`.
+          200: {
+            type: 'object',
+            properties: { ...userProperties, ok: { type: 'boolean' } },
+          },
           400: errorResponse,
           401: errorResponse,
         },

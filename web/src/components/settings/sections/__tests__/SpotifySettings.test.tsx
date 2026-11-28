@@ -69,4 +69,15 @@ describe('SpotifySettings', () => {
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
+
+  it('reconnects with the saved app once Spotify access has expired', async () => {
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({ windom_spotify_client_id: 'saved-client' } as never);
+    settings.integrations.spotify.connected = true;
+    render(<SpotifySettings />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reconnect' }));
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(apiPost).mock.calls[0][1]).toMatchObject({ clientId: 'saved-client' });
+  });
 });

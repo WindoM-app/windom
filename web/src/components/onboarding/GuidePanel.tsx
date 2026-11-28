@@ -35,10 +35,10 @@ const SECTIONS: GuideSection[] = [
         type: 'steps',
         content: [
           'Go to developer.spotify.com/dashboard and create a free app. Set API to "Web API".',
-          'Open WindoM Settings → Spotify tab. Copy the Redirect URI shown there using the Copy button.',
+          'Open WindoM Settings → Apps → Spotify. Copy the Redirect URI shown there using the Copy button.',
           'Back in the Spotify Dashboard → your app → Settings → Redirect URIs → paste it → Add → Save.',
           'Copy the Client ID from your Spotify app dashboard.',
-          'Paste it into WindoM Settings → Spotify tab and click "Save & Connect".',
+          'Paste it into WindoM Settings → Apps → Spotify and click "Save & Connect".',
           'Authorize in the Spotify popup. Done - now-playing appears in your dock.',
         ],
       },
@@ -46,6 +46,16 @@ const SECTIONS: GuideSection[] = [
         type: 'tip',
         content:
           'Getting "Invalid Client"? The Redirect URI wasn\'t saved in your Spotify app, or the Client ID is wrong. Use the Copy button - don\'t type the URI by hand.',
+      },
+      {
+        type: 'tip',
+        content:
+          'Nothing open to play on? Press play and WindoM opens the Spotify web player in a background tab. Sign in there if it asks.',
+      },
+      {
+        type: 'tip',
+        content:
+          'Spotify ends access after six months. When the player says "Reconnect", press it and authorize again.',
       },
     ],
   },

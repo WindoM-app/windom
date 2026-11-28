@@ -13,6 +13,17 @@ import {
 const security = [{ bearerAuth: [] }];
 const errorResponse = { $ref: 'Error#' };
 const emptyOk = { type: 'object', properties: { success: { type: 'boolean' } } };
+const trackSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    artist: { type: 'string' },
+    album: { type: 'string' },
+    albumArt: { type: ['string', 'null'] },
+    durationMs: { type: 'integer' },
+    url: { type: 'string' },
+  },
+};
 
 export function spotifyRoutes(app: FastifyInstance): void {
   app.get(
@@ -26,11 +37,7 @@ export function spotifyRoutes(app: FastifyInstance): void {
         response: {
           200: {
             type: 'object',
-            properties: {
-              id: { type: 'string' },
-              displayName: { type: 'string' },
-              imageUrl: { type: 'string' },
-            },
+            properties: { connected: { type: 'boolean' } },
           },
           401: errorResponse,
           403: errorResponse,
@@ -51,15 +58,11 @@ export function spotifyRoutes(app: FastifyInstance): void {
         response: {
           200: {
             type: 'object',
-            nullable: true,
             properties: {
               isPlaying: { type: 'boolean' },
-              trackName: { type: 'string' },
-              artistName: { type: 'string' },
-              albumName: { type: 'string' },
-              albumImageUrl: { type: 'string' },
               progressMs: { type: 'integer' },
-              durationMs: { type: 'integer' },
+              // The serializer drops whatever is not named here.
+              track: { ...trackSchema, type: ['object', 'null'] },
             },
           },
           401: errorResponse,
@@ -84,17 +87,7 @@ export function spotifyRoutes(app: FastifyInstance): void {
             properties: {
               tracks: {
                 type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    artist: { type: 'string' },
-                    album: { type: 'string' },
-                    albumArt: { type: ['string', 'null'] },
-                    durationMs: { type: 'integer' },
-                    url: { type: 'string' },
-                  },
-                },
+                items: trackSchema,
               },
             },
           },
