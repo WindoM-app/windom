@@ -1,0 +1,4 @@
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://sdk.scdn.co; frame-src https://sdk.scdn.co; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors chrome-extension://comcnbccalbfcegbmaemancbhgpijkpb
+  X-Content-Type-Options: nosniff
+  Cache-Control: no-cache
