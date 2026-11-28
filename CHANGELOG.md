@@ -7,6 +7,45 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.2] - 2026-11-28
+
+A security and bug-fix release for the extension and the server. No schema
+migrations. No permission changes.
+
+### Security
+- **Sign-in and accounts.** Google sign-in requires a verified address, and
+  signing in to an address that was registered but never verified starts that
+  account afresh: password, sessions, connections and settings are removed. A
+  replaced session token that comes back now ends every session. Connecting
+  Google or Spotify can only be finished by the account that started it, and
+  the unused `GET /…/callback` routes are removed. Changing the password signs
+  out other sessions. Names are escaped in emails. (#562)
+- Saved session tokens and keys can no longer be read by the script that runs
+  on web pages. (#560)
+
+### Fixed
+- **Settings are no longer overwritten** by the server copy when a new tab
+  opens, and edits made after the session token expired are uploaded. (#561)
+- Reset no longer deletes tasks and events. A task that cannot be saved stays
+  in the input, with a message. (#561)
+- Editing a link address no longer loses focus on every keystroke, and rapid
+  edits stay within Chrome's storage limits. (#561)
+- A server or network error while renewing the session no longer signs you
+  out. (#561)
+- The password reset form works again. (#562)
+- **Search overlay on web pages:** suggestions and open-tab search work, and
+  the overlay loads only when it is first used. (#560)
+- The add-link form in the dock no longer clips and is readable. (#557, #560)
+
+### Changed
+- Selects, segmented controls and stock search are named for screen readers.
+  (#560)
+- Hidden tabs stop polling. The wallpaper loads first. (#560, #561)
+- Scrolling panels fade at their edges, and collapsed guide sections can be
+  found with the browser's page search. (#561)
+
+---
+
 ## [1.8.1] - 2026-11-18
 
 An extension and website release. The server is unchanged apart from its
