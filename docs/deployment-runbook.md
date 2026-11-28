@@ -140,6 +140,33 @@ retention window.
 - If an erasure request must cover logs inside the window, Fly support is the
   only route the repo knows of.
 
+### Database backup retention (measured 2026-11-28)
+
+| What | Setting | Read with |
+|---|---|---|
+| Postgres backups and WAL | recovery window **7 days**, a full backup every 24 h, at least 3 kept | `flyctl postgres backup config show --app <db app>` |
+| Volume snapshots | **5 days** | `flyctl volumes list --app <db app> --json` |
+
+Deleted data can therefore survive in a backup for a little over 7 days. That is
+inside the 30 days the privacy policy promises, but longer than the **5 days**
+Spotify's Developer Terms (Appendix A) allow for a disconnected user's Spotify
+data. Shortening the window also shortens how far back a restore can go.
+
+## Security incidents
+
+1. Stop the leak first: revoke or rotate whatever is exposed.
+2. Note the time you became aware. The clocks below start there.
+3. **Within 24 hours**, if Spotify data (tokens, account details, anything read
+   from Spotify) may have been accessed, lost or disclosed: report it to Spotify
+   at the security address given in Appendix A of the
+   [Developer Terms](https://developer.spotify.com/terms). Report on suspicion;
+   do not wait for the investigation to finish.
+4. **Within 72 hours**, if personal data of people in the EU is involved, assess
+   the duty to notify a supervisory authority; also check the duties under
+   Israeli privacy law. Take legal advice.
+5. Tell affected users what happened and what they should do.
+6. Keep the evidence: Fly logs expire after 7 days (see above), so save them early.
+
 ## Chrome Web Store credentials
 
 The store upload signs in to Google with three secrets in the **`chrome-store`
