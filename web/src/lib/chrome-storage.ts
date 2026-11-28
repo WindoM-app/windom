@@ -127,4 +127,14 @@ export const localStore = {
       return false;
     }
   },
+
+  onChange(callback: (changes: { [key: string]: chrome.storage.StorageChange }) => void) {
+    const listener = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local') {
+        callback(changes);
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  },
 };

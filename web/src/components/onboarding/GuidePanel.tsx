@@ -222,16 +222,21 @@ function GuideSectionItem({
 }): React.ReactElement {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`guide-section${open ? ' open' : ''}`}>
-      <button className="guide-section-header" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+    // <details> keeps collapsed text in the page, so find-in-page can open it.
+    <details
+      className={`guide-section${open ? ' open' : ''}`}
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary className="guide-section-header">
         <div className="guide-section-meta">
           <span className="guide-section-title">{section.title}</span>
           <span className="guide-section-summary">{section.summary}</span>
         </div>
         <span className="guide-section-chevron">{open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
-      </button>
-      {open && <div className="guide-section-body">{section.blocks.map((block, i) => renderBlock(block, i))}</div>}
-    </div>
+      </summary>
+      <div className="guide-section-body">{section.blocks.map((block, i) => renderBlock(block, i))}</div>
+    </details>
   );
 }
 

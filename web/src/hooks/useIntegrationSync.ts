@@ -15,6 +15,9 @@ interface IntegrationsResponse {
   features?: { gmail?: boolean };
 }
 
+const PROVIDERS = ['calendar', 'spotify', 'gmail', 'github'] as const;
+type Provider = (typeof PROVIDERS)[number];
+
 /**
  * Syncs calendar/spotify connected state from the server once both
  * settings storage and auth init have finished. Clears both flags on logout.
@@ -40,17 +43,23 @@ export function useIntegrationSync() {
   useEffect(() => {
     if (!settingsLoaded || authLoading) return;
 
-    if (!userId) {
+    // Only a changed flag is worth a write: every write also uploads the section.
+    const apply = (flags: Record<Provider, boolean>) => {
       const current = integrationsRef.current;
+      if (PROVIDERS.every((p) => current[p].connected === flags[p])) return;
       void updateMultiple({
         integrations: {
           ...current,
-          calendar: { ...current.calendar, connected: false },
-          spotify: { ...current.spotify, connected: false },
-          gmail: { ...current.gmail, connected: false },
-          github: { ...current.github, connected: false },
+          calendar: { ...current.calendar, connected: flags.calendar },
+          spotify: { ...current.spotify, connected: flags.spotify },
+          gmail: { ...current.gmail, connected: flags.gmail },
+          github: { ...current.github, connected: flags.github },
         },
       });
+    };
+
+    if (!userId) {
+      apply({ calendar: false, spotify: false, gmail: false, github: false });
       return;
     }
 
@@ -68,15 +77,11 @@ export function useIntegrationSync() {
         const gmailOffered = features ? features.gmail === true : true;
         setGmailAvailable(gmailOffered);
         const hasGmailScope = gmailOffered && google.scopes.some((s) => s.includes('gmail'));
-        const current = integrationsRef.current;
-        void updateMultiple({
-          integrations: {
-            ...current,
-            calendar: { ...current.calendar, connected: google.connected },
-            spotify: { ...current.spotify, connected: spotify.connected },
-            gmail: { ...current.gmail, connected: google.connected && hasGmailScope },
-            github: { ...current.github, connected: github.connected },
-          },
+        apply({
+          calendar: google.connected,
+          spotify: spotify.connected,
+          gmail: google.connected && hasGmailScope,
+          github: github.connected,
         });
       } catch (err: unknown) {
         log.error('Failed to sync integration status:', err);

@@ -318,13 +318,62 @@ a {
 }
 
 /* ============================================================
+   Scroll fades
+   ============================================================ */
+/* Content fades at an edge only while there is more beyond it. Driven by the
+   scroller's own position, so a list that fits shows no fade. */
+@property --fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes reveal-fade-start {
+  to {
+    --fade-start: 24px;
+  }
+}
+@keyframes hide-fade-end {
+  from {
+    --fade-end: 24px;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .tab-sidebar-list,
+  .sidebar-content,
+  .settings-body,
+  .app-center-body,
+  .guide-panel-body,
+  .finance-dashboard-scroll {
+    scroll-padding-block: 24px;
+    mask:
+      linear-gradient(black, black) no-clip subtract,
+      linear-gradient(to bottom, black, transparent) 0 0 / 100% var(--fade-start) no-repeat no-clip,
+      linear-gradient(to bottom, transparent, black) 0 100% / 100% var(--fade-end) no-repeat no-clip;
+    /* Longhands on purpose: the minifier expands the shorthand with a 0s
+       duration, which pins a scroll timeline at its end state. */
+    animation-name: reveal-fade-start, hide-fade-end;
+    animation-duration: auto;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(self block);
+    animation-range:
+      0 24px,
+      calc(100% - 24px) 100%;
+  }
+}
+
+/* ============================================================
    Scrollbar
    ============================================================ */
 /* No visible scrollbars anywhere.
    Content still scrolls by wheel, trackpad and keyboard; what signals there is
-   more of it is the card clipped by the panel's bottom edge, which is a better
-   affordance than a hairline over a photograph. Two containers already did
-   this - .dock-rows and .finance-dashboard-scroll - so this generalises it. */
+   more of it is the edge fade below, which reads better than a hairline over a
+   photograph. */
 * {
   scrollbar-width: none;
 }
@@ -1698,6 +1747,12 @@ input.clock-size-slider:focus-visible {
   cursor: pointer;
   text-align: left;
   transition: all 0.15s ease;
+}
+
+/* Long tab lists: skip layout and paint for rows that are scrolled out of view. */
+.tab-sidebar-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
 }
 
 .tab-sidebar-item:hover {
@@ -4975,9 +5030,8 @@ body.focus-exiting .sidebar-container {
 }
 
 .guide-section-header {
-  width: 100%;
+  list-style: none;
   background: none;
-  border: none;
   cursor: pointer;
   padding: 9px 14px;
   display: flex;
@@ -4986,6 +5040,9 @@ body.focus-exiting .sidebar-container {
   gap: 10px;
   text-align: left;
   transition: background 0.15s;
+}
+.guide-section-header::-webkit-details-marker {
+  display: none;
 }
 .guide-section-header:hover {
   background: rgba(255, 255, 255, 0.03);

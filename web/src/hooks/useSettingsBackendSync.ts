@@ -8,7 +8,9 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { syncStorage } from '../lib/chrome-storage';
 import { type Settings, defaultSettings } from '../types/settings';
-import { getAccessToken, apiGet, apiPut } from '../lib/api';
+import { getAccessToken, refreshAccessToken, apiGet, apiPut } from '../lib/api';
+import { loadLocalSettings } from '../lib/settings-load';
+import { KEY_TIMESTAMPS_STORAGE_KEY } from './useSettingsCrossTab';
 import {
   type DirtyMap,
   type ServerRev,
@@ -58,6 +60,8 @@ export interface SettingsBackendSync {
 export function useSettingsBackendSync(
   setSettings: SetSettings,
   settingsRef: RefObject<Settings>,
+  stamp: (sections: string[]) => Record<string, number>,
+  initialLoad: Promise<void>,
 ): SettingsBackendSync {
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDeltaRef = useRef<Partial<Settings>>({});
@@ -73,7 +77,8 @@ export function useSettingsBackendSync(
       pendingDeltaRef.current = {};
       if (Object.keys(toSend).length === 0) return;
       try {
-        const token = await getAccessToken();
+        // The token lives 15 minutes; an edit in an older tab has to renew it.
+        const token = (await getAccessToken()) ?? (await refreshAccessToken());
         if (!token) return;
         const [base, dirty] = await Promise.all([getBaseRev(), getDirty()]);
         await pushSections(toSend, base, pickSections(dirty, Object.keys(toSend)) as DirtyMap);
@@ -167,7 +172,11 @@ export function useSettingsBackendSync(
         const storable = stripSecrets(
           Object.fromEntries(Object.entries(merged).filter(([k]) => !SYNC_EXCLUDE.has(k as keyof Settings))),
         );
-        await syncStorage.setMultiple(storable as unknown as Record<string, unknown>);
+        // Stamped, or tabs holding an older stamp would ignore the pulled copy.
+        await syncStorage.setMultiple({
+          ...(storable as unknown as Record<string, unknown>),
+          [KEY_TIMESTAMPS_STORAGE_KEY]: stamp(Object.keys(storable)),
+        });
 
         // We have now seen everything up to serverRev.
         if (typeof serverRev === 'number') await setBaseRev(serverRev);
@@ -181,14 +190,22 @@ export function useSettingsBackendSync(
         log.warn('Backend sync failed - staying on local:', err);
       }
     },
-    [setSettings],
+    [setSettings, stamp],
   );
 
-  // Re-sync on login - backend always wins to overwrite local state with account's settings
+  // Re-sync when auth lands. On a sign-in the account's copy replaces local state.
+  // A restored session reconciles by revision, so unsent edits made here are kept.
   useEffect(() => {
     const handler = async (e: Event) => {
-      const authName = (e as CustomEvent<{ name?: string }>).detail?.name ?? '';
-      await syncWithBackend(settingsRef.current, true);
+      const detail = (e as CustomEvent<{ name?: string; restore?: boolean }>).detail;
+      const authName = detail?.name ?? '';
+      if (detail?.restore) {
+        // Restore can beat the initial load, which may still be migrating storage.
+        await initialLoad;
+        await syncWithBackend(await loadLocalSettings());
+      } else {
+        await syncWithBackend(settingsRef.current, true);
+      }
       if (!authName) return;
       setSettings((s) => {
         if (s.general.userName !== defaultSettings.general.userName) return s;
@@ -200,7 +217,7 @@ export function useSettingsBackendSync(
     };
     window.addEventListener('windom-auth-login', handler);
     return () => window.removeEventListener('windom-auth-login', handler);
-  }, [syncWithBackend, setSettings, settingsRef]);
+  }, [syncWithBackend, setSettings, settingsRef, initialLoad]);
 
   return { syncWithBackend, queuePush, markUnsynced };
 }

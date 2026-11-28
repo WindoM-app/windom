@@ -17,8 +17,6 @@ export interface SettingsCrossTab {
   loadStamps: () => Promise<void>;
   /** Stamp `sections` with one `Date.now()`; returns a copy of all stamps to persist. */
   stamp: (sections: string[]) => Record<string, number>;
-  /** Forget every stamp (on reset). */
-  clearStamps: () => void;
 }
 
 export function useSettingsCrossTab(setSettings: SetSettings): SettingsCrossTab {
@@ -32,10 +30,6 @@ export function useSettingsCrossTab(setSettings: SetSettings): SettingsCrossTab 
     const now = Date.now();
     for (const k of sections) keyTimestampsRef.current[k] = now;
     return { ...keyTimestampsRef.current };
-  }, []);
-
-  const clearStamps = useCallback(() => {
-    keyTimestampsRef.current = {};
   }, []);
 
   // Apply remote section updates, resolving conflicts via section-level timestamps
@@ -72,5 +66,5 @@ export function useSettingsCrossTab(setSettings: SetSettings): SettingsCrossTab 
     return unsub;
   }, [setSettings]);
 
-  return { loadStamps, stamp, clearStamps };
+  return { loadStamps, stamp };
 }

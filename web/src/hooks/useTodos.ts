@@ -18,7 +18,8 @@ export function useTodos() {
   // Cross-tab sync
   useEffect(() => {
     const unsub = syncStorage.onChange((changes) => {
-      if (changes.todos) setTodos(changes.todos.newValue as TodoItem[]);
+      // `newValue` is absent when the key is removed.
+      if (changes.todos) setTodos((changes.todos.newValue as TodoItem[] | undefined) ?? []);
     });
     return unsub;
   }, []);
@@ -27,7 +28,10 @@ export function useTodos() {
   // can hold a control disabled while it is in flight.
   const save = useCallback(async (next: TodoItem[]): Promise<boolean> => {
     setTodos(next);
-    return syncStorage.set('todos', next);
+    const saved = await syncStorage.set('todos', next);
+    // Show what is really stored: an unsaved change would vanish on reload anyway.
+    if (!saved) setTodos(await syncStorage.get<TodoItem[]>('todos', []));
+    return saved;
   }, []);
 
   const addTodo = useCallback(

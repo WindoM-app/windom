@@ -127,7 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ]);
             setUser(me);
             initLog.debug('User loaded:', me.email ?? me.name);
-            window.dispatchEvent(new CustomEvent('windom-auth-login', { detail: { name: me.name } }));
+            // `restore`: an existing session, not a sign-in. Local edits survive it.
+            window.dispatchEvent(new CustomEvent('windom-auth-login', { detail: { name: me.name, restore: true } }));
           } catch (err) {
             initLog.error('/me failed - clearing token:', err);
             await clearAccessToken();

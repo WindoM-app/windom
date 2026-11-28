@@ -17,6 +17,7 @@ vi.mock('../../lib/chrome-storage', () => ({
     onChange: vi.fn().mockReturnValue(() => {}),
   },
   localStore: {
+    onChange: vi.fn().mockReturnValue(() => {}),
     get: vi.fn().mockImplementation((_k: unknown, def: unknown) => Promise.resolve(def)),
     set: vi.fn().mockResolvedValue(true),
     remove: vi.fn().mockResolvedValue(true),
@@ -27,6 +28,7 @@ vi.mock('../../lib/chrome-storage', () => ({
 // No access token → syncWithBackend returns early without touching the API.
 vi.mock('../../lib/api', () => ({
   getAccessToken: vi.fn().mockResolvedValue(null),
+  refreshAccessToken: vi.fn().mockResolvedValue(null),
   apiGet: vi.fn(),
   apiPut: vi.fn(),
 }));
@@ -215,10 +217,50 @@ describe('updateMultiple', () => {
   });
 });
 
+// ── auth events ───────────────────────────────────────────────────────────────
+
+describe('windom-auth-login', () => {
+  afterEach(() => {
+    vi.mocked(getAccessToken).mockResolvedValue(null);
+    vi.mocked(apiGet).mockReset();
+    vi.mocked(apiPut).mockReset();
+  });
+
+  async function loginWithDirtyEdit(restore: boolean) {
+    await mountAndWait();
+    vi.mocked(getAccessToken).mockResolvedValue('token');
+    vi.mocked(apiGet).mockResolvedValue({ data: { general: { userName: 'Server' } }, updatedAt: 5 });
+    vi.mocked(apiPut).mockResolvedValue({ data: null, updatedAt: 6, previousUpdatedAt: 5 });
+    vi.mocked(localStore.get).mockImplementation((key, def) =>
+      Promise.resolve(key === SERVER_REV_KEY ? 5 : key === DIRTY_KEY ? ({ general: 1 } as never) : def),
+    );
+    vi.mocked(apiPut).mockClear();
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('windom-auth-login', { detail: { name: 'Alice', restore } }));
+    });
+  }
+
+  it('uploads unsent edits when a session is restored', async () => {
+    await loginWithDirtyEdit(true);
+    await waitFor(() =>
+      expect(apiPut).toHaveBeenCalledWith('/settings', expect.objectContaining({ general: expect.anything() })),
+    );
+  });
+
+  it('takes the account copy on a sign-in', async () => {
+    await loginWithDirtyEdit(false);
+    await waitFor(() =>
+      expect(syncStorage.setMultiple).toHaveBeenCalledWith(
+        expect.objectContaining({ general: expect.objectContaining({ userName: 'Server' }) }),
+      ),
+    );
+  });
+});
+
 // ── reset ─────────────────────────────────────────────────────────────────────
 
 describe('reset', () => {
-  it('restores defaultSettings and clears sync storage', async () => {
+  it('restores defaultSettings without clearing the rest of sync storage', async () => {
     const { result } = await mountAndWait();
 
     // First, change something
@@ -233,7 +275,9 @@ describe('reset', () => {
 
     expect(result.current.settings.general.userName).toBe(defaultSettings.general.userName);
     expect(result.current.settings.clock).toEqual(defaultSettings.clock);
-    expect(syncStorage.clear).toHaveBeenCalled();
+    // Todos and events live in the same store.
+    expect(syncStorage.clear).not.toHaveBeenCalled();
+    expect(vi.mocked(syncStorage.setMultiple).mock.calls.every(([values]) => !('todos' in values))).toBe(true);
   });
 
   it('rewrites defaultSettings to sync storage after reset', async () => {
