@@ -30,7 +30,8 @@ export function componentsOf(file) {
   if (file.startsWith('.github/assets/')) return [];
   if (file.startsWith('.github/') || file === '.gitattributes') return COMPONENTS;
   if (file.startsWith('backend/') || file === 'docker-compose.yml' || file === '.env.example') return ['backend'];
-  if (file.startsWith('web/')) return ['web'];
+  // The hosted Spotify player page is tested from the web suite.
+  if (file.startsWith('web/') || file.startsWith('player/')) return ['web'];
   return [];
 }
 

@@ -65,3 +65,7 @@ test('anything that cannot be pinned down runs everything', () => {
   assert.equal(diffRange({ event: 'pull_request', base: A, head: 'main' }), null);
   assert.equal(diffRange({ event: 'workflow_dispatch', base: A, head: B }), null);
 });
+
+test('the Spotify player page runs the web checks', () => {
+  assert.deepEqual(componentsOf('player/player.js'), ['web']);
+});
