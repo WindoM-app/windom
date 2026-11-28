@@ -7,9 +7,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
+## [1.9.0] - 2026-11-28
 
-Web only. No permission, server or schema changes.
+A new extension feature. No permission or schema changes; the server code is
+unchanged apart from the version.
 
 ### Added
 
