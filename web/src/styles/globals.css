@@ -1067,8 +1067,8 @@ input.clock-size-slider:focus-visible {
 }
 .dock-expandable.expanded {
   width: 280px;
-  height: 192px;
-  border-radius: var(--r-pill);
+  height: 200px;
+  border-radius: var(--r-card);
   opacity: 1;
   cursor: default;
 }
@@ -1103,11 +1103,12 @@ input.clock-size-slider:focus-visible {
   top: 0;
   left: 0;
   width: 280px;
-  height: 192px;
+  height: 200px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 30px 20px 20px;
+  padding: 34px 20px 20px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease 0.2s;
