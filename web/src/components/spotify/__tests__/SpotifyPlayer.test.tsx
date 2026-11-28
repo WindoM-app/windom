@@ -18,7 +18,7 @@ const track = (name: string) => ({
   name,
   artist: 'The Artist',
   album: 'A',
-  albumArt: null,
+  albumArt: null as string | null,
   durationMs: 200_000,
   url: `https://open.spotify.com/track/${name}`,
 });
@@ -73,6 +73,17 @@ describe('what is playing', () => {
 
     const link = screen.getByRole('link', { name: 'One · The Artist' });
     expect(link.getAttribute('href')).toBe('https://open.spotify.com/track/One');
+  });
+
+  it('shows cover art uncovered, next to a link marked with the Spotify logo', async () => {
+    server = { isPlaying: true, progressMs: 0, track: { ...track('One'), albumArt: 'https://i.scdn.co/image/one' } };
+    const { container } = await mount();
+
+    const art = container.querySelector('img') as HTMLImageElement;
+    expect(art.getAttribute('src')).toBe('https://i.scdn.co/image/one');
+    expect(art.closest('button')).toBeNull();
+    expect(art.parentElement?.className).toBe('spotify-dock-expand-inner');
+    expect(screen.getByRole('link', { name: 'Open Spotify' }).querySelector('svg')).toBeTruthy();
   });
 
   it('says so when nothing is loaded', async () => {

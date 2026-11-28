@@ -130,3 +130,37 @@ describe('settings link validation', () => {
     expect(saveSettings).toHaveBeenCalledWith('user-1', { widgets: { quickLinks: [] } });
   });
 });
+
+describe('settings the extension syncs', () => {
+  const put = (payload: object) => app.inject({ method: 'PUT', url: '/settings', headers: { authorization }, payload });
+
+  it('keeps every synced key instead of silently dropping it', async () => {
+    const payload = {
+      general: { showHistory: true, showTodo: false },
+      integrations: {
+        spotify: { connected: true, showTopTracks: true },
+        finance: {
+          connected: false,
+          showStocks: true,
+          showCrypto: true,
+          watchlistTickers: ['AAPL'],
+          cryptoWatchlist: ['bitcoin'],
+        },
+        github: { connected: true, show: false },
+      },
+    };
+
+    expect((await put(payload)).statusCode).toBe(200);
+    expect(saveSettings).toHaveBeenCalledWith('user-1', payload);
+  });
+
+  it('does not erase provider keys a partial upload leaves out', async () => {
+    stored = { integrations: { spotify: { showTopTracks: true }, github: { show: false } } };
+
+    await put({ integrations: { spotify: { connected: true } } });
+
+    expect(saveSettings).toHaveBeenCalledWith('user-1', {
+      integrations: { spotify: { connected: true, showTopTracks: true }, github: { show: false } },
+    });
+  });
+});

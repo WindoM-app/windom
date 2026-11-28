@@ -31,6 +31,14 @@ Deploying the server alone restores "now playing" for installed extensions.
 - The player works again in a tab left open for a long time.
 - A sign-in that reaches its time limit now says that, instead of signing out
   without a reason.
+- **Some settings never synced.** The History and Tasks switches, top tracks,
+  market watchlists and the GitHub widget switch were dropped by the server, and
+  a download could turn top tracks off again.
+
+### Changed
+- Spotify cover art is shown square, still and uncovered, beside the Spotify
+  logo, as Spotify's design rules require. The spinning disc and the bars over
+  it are gone, and play and pause have their own button.
 
 ---
 

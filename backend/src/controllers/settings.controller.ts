@@ -23,6 +23,9 @@ const quickLinkSchema = z.object({
 });
 
 /** Exported so export-policy.test.ts can check every settings key is classified for GET /me/export. */
+// Generous on purpose: exceeding a limit rejects the whole settings upload.
+const watchlistSchema = z.array(z.string().max(100)).max(500);
+
 export const settingsSectionSchema = z.object({
   general: z
     .object({
@@ -30,6 +33,8 @@ export const settingsSectionSchema = z.object({
       searchEngine: z.enum(['google', 'bing', 'duckduckgo', 'brave']),
       sidebarSide: z.enum(['left', 'right']),
       showGreeting: z.boolean(),
+      showHistory: z.boolean(),
+      showTodo: z.boolean(),
     })
     .partial()
     .optional(),
@@ -91,10 +96,28 @@ export const settingsSectionSchema = z.object({
       spotify: z
         .object({
           connected: z.boolean(),
+          showTopTracks: z.boolean(),
         })
         .partial()
         .optional(),
       gmail: z
+        .object({
+          connected: z.boolean(),
+          show: z.boolean(),
+        })
+        .partial()
+        .optional(),
+      finance: z
+        .object({
+          connected: z.boolean(),
+          showStocks: z.boolean(),
+          showCrypto: z.boolean(),
+          watchlistTickers: watchlistSchema,
+          cryptoWatchlist: watchlistSchema,
+        })
+        .partial()
+        .optional(),
+      github: z
         .object({
           connected: z.boolean(),
           show: z.boolean(),
@@ -108,19 +131,29 @@ export const settingsSectionSchema = z.object({
   _updatedAt: z.number().optional(),
 });
 
-/** Deep-merge (one level) incoming sections over the stored blob; unrelated sections survive. */
+const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+/**
+ * Merge incoming sections over the stored blob; unrelated sections and keys survive.
+ * `integrations` holds one object per provider, so it is merged one level deeper:
+ * a client that sends only some of a provider's keys must not erase the others.
+ */
 export function mergeSections(
   existing: Record<string, unknown>,
   incomingSections: Record<string, unknown>,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...existing };
   for (const [section, value] of Object.entries(incomingSections)) {
-    if (value !== undefined) {
-      merged[section] = {
-        ...(typeof existing[section] === 'object' && existing[section] !== null ? existing[section] : {}),
-        ...(value as Record<string, unknown>),
-      };
+    if (value === undefined) continue;
+    const stored = asRecord(existing[section]);
+    const next: Record<string, unknown> = { ...stored, ...asRecord(value) };
+    if (section === 'integrations') {
+      for (const [provider, fields] of Object.entries(asRecord(value))) {
+        next[provider] = { ...asRecord(stored[provider]), ...asRecord(fields) };
+      }
     }
+    merged[section] = next;
   }
   return merged;
 }
