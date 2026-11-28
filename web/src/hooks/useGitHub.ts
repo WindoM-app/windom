@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiGet } from '../lib/api';
 import { useSettings } from '../contexts/SettingsContext';
 import { GITHUB_POLL_INTERVAL_MS } from '../lib/timing-constants';
+import { startVisibleInterval } from '../lib/visible-interval';
 
 export interface GitHubSummary {
   notificationCount: number;
@@ -16,7 +17,7 @@ export function useGitHub() {
   const [summary, setSummary] = useState<GitHubSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPollRef = useRef<(() => void) | null>(null);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -35,18 +36,18 @@ export function useGitHub() {
     if (!githubConnected) {
       setSummary(null);
       setError(null);
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPollRef.current?.();
       return;
     }
 
     setLoading(true);
     void fetchSummary();
-    pollRef.current = setInterval(() => {
+    stopPollRef.current = startVisibleInterval(() => {
       void fetchSummary();
     }, GITHUB_POLL_INTERVAL_MS);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPollRef.current?.();
     };
   }, [githubConnected, fetchSummary]);
 

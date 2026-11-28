@@ -91,9 +91,10 @@ export function GeneralSettings({ onReset }: Props) {
 
       <div className="settings-group">
         <label className="settings-section-heading settings-label">Tab Sidebar</label>
-        <div className="segmented-control">
+        <div role="group" aria-label="Tab sidebar side" className="segmented-control">
           <button
             className={`segmented-btn${settings.general.sidebarSide === 'left' ? ' active' : ''}`}
+            aria-pressed={settings.general.sidebarSide === 'left'}
             onClick={() => update('general', { sidebarSide: 'left' })}
           >
             <PanelLeft size={14} strokeWidth={1.8} />
@@ -101,6 +102,7 @@ export function GeneralSettings({ onReset }: Props) {
           </button>
           <button
             className={`segmented-btn${settings.general.sidebarSide === 'right' ? ' active' : ''}`}
+            aria-pressed={settings.general.sidebarSide === 'right'}
             onClick={() => update('general', { sidebarSide: 'right' })}
           >
             <PanelRight size={14} strokeWidth={1.8} />

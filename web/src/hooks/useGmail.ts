@@ -3,6 +3,7 @@ import { apiGet } from '../lib/api';
 import { useSettingsSection } from '../contexts/SettingsContext';
 import { useGmailAvailable } from './useServerFeatures';
 import { GMAIL_POLL_INTERVAL_MS } from '../lib/timing-constants';
+import { startVisibleInterval } from '../lib/visible-interval';
 
 export interface GmailMessage {
   id: string;
@@ -37,7 +38,7 @@ export function useGmail() {
   const [summary, setSummary] = useState<GmailSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopPollRef = useRef<(() => void) | null>(null);
 
   const fetchSummary = useCallback(async () => {
     try {
@@ -56,18 +57,18 @@ export function useGmail() {
     if (!gmailConnected) {
       setSummary(null);
       setError(null);
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPollRef.current?.();
       return;
     }
 
     setLoading(true);
     void fetchSummary();
-    pollRef.current = setInterval(() => {
+    stopPollRef.current = startVisibleInterval(() => {
       void fetchSummary();
     }, GMAIL_POLL_INTERVAL_MS);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPollRef.current?.();
     };
   }, [gmailConnected, fetchSummary]);
 

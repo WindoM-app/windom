@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useOAuthConnection } from '../../../hooks/useOAuthConnection';
@@ -18,6 +19,7 @@ function GoogleCalendarIcon() {
 }
 
 export function CalendarSettings() {
+  const selectLabelId = useId();
   const { user } = useAuth();
   const { settings, update } = useSettings();
   const { calendar } = settings.integrations;
@@ -99,8 +101,11 @@ export function CalendarSettings() {
       {/* Look-ahead window - only meaningful when connected */}
       {calendar.connected && (
         <div className="settings-row">
-          <label className="settings-label">Look-ahead window</label>
+          <label id={selectLabelId} className="settings-label">
+            Look-ahead window
+          </label>
           <GlassSelect
+            labelledBy={selectLabelId}
             value={String(calendar.days)}
             onChange={(v) => void update('integrations', { calendar: { ...calendar, days: Number(v) as 7 | 14 | 30 } })}
             options={[

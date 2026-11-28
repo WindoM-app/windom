@@ -1,5 +1,12 @@
-/** Background service worker - closes duplicate new tabs and runs tab commands for content scripts */
-import { isOwnExtensionSender, isTabId, parseTabCommand } from '../lib/runtime-messages';
+/** Background service worker - closes duplicate new tabs and answers content scripts */
+import {
+  isOwnExtensionSender,
+  isTabId,
+  parseOverlayRequest,
+  parseTabCommand,
+  type OverlayRequest,
+} from '../lib/runtime-messages';
+import { fetchSearchTerms, matchTabs } from '../lib/web-search';
 
 /** The tab list earlier versions mirrored into storage on every tab event. */
 const LEGACY_TABS_SNAPSHOT_KEY = '_windom_tabs';
@@ -10,6 +17,12 @@ const LEGACY_TABS_SNAPSHOT_KEY = '_windom_tabs';
 // sidebar is mounted only on the new tab page, which asks chrome.tabs itself -
 // so it was browsing history handed to untrusted renderers for nothing. Drop
 // the stored copy on update.
+// chrome.storage.local holds the session token and API keys, and by default
+// every content script can read it. No content script needs it, so limit it to
+// extension pages and this worker. Chrome versions without the method for the
+// local area keep the old behaviour.
+chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })?.catch(() => {});
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.remove(LEGACY_TABS_SNAPSHOT_KEY).catch(() => {});
 });
@@ -66,5 +79,41 @@ chrome.runtime.onMessage.addListener((payload: unknown, sender, sendResponse) =>
   };
 
   handle().catch(() => sendResponse({ ok: false }));
+  return true; // keep channel open for async response
+});
+
+async function answerOverlay(request: OverlayRequest, sender: chrome.runtime.MessageSender): Promise<unknown> {
+  switch (request.type) {
+    case 'WINDOM_CMD_SUGGEST':
+      return { terms: await fetchSearchTerms(request.query) };
+    case 'WINDOM_CMD_QUERY_TABS': {
+      // A normal window's page is never told about private tabs, nor the reverse.
+      const tabs = (await chrome.tabs.query({})).filter((t) => t.incognito === sender.tab?.incognito);
+      // Only what the row shows and switching needs; no favicon addresses.
+      return {
+        tabs: matchTabs(tabs, request.query).map(({ tabId, windowId, title, url }) => ({
+          tabId,
+          windowId,
+          title,
+          url,
+        })),
+      };
+    }
+    case 'WINDOM_CMD_FOCUS_TAB':
+      await chrome.tabs.update(request.tabId, { active: true });
+      if (request.windowId !== undefined) await chrome.windows.update(request.windowId, { focused: true });
+      return { ok: true };
+  }
+}
+
+// Requests from the search overlay on web pages. Answered only to a script
+// running in a tab.
+chrome.runtime.onMessage.addListener((payload: unknown, sender, sendResponse) => {
+  if (!isOwnExtensionSender(sender) || !isTabId(sender.tab?.id)) return;
+  const request = parseOverlayRequest(payload);
+  if (!request) return;
+  answerOverlay(request, sender)
+    .then(sendResponse)
+    .catch(() => sendResponse({ ok: false }));
   return true; // keep channel open for async response
 });

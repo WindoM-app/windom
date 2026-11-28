@@ -115,6 +115,7 @@ export function TabSidebar() {
               onClick={() => handleTabClick(tab)}
               type="button"
               title={tab.title}
+              aria-current={tab.active ? 'page' : undefined}
             >
               {tab.favIconUrl ? (
                 <img src={tab.favIconUrl} className="tab-sidebar-favicon" alt="" loading="lazy" />

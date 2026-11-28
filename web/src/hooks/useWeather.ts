@@ -4,6 +4,7 @@ import { useLocation, watchGeolocationPermission } from './useLocation';
 import { localStore as ls } from '../lib/chrome-storage';
 import { convertTemperature } from '../utils/temperature';
 import type { WeatherData } from '../types/weather';
+import { startVisibleInterval } from '../lib/visible-interval';
 
 const CACHE_EXPIRY = 30 * 60 * 1000;
 
@@ -57,7 +58,7 @@ export function useWeather() {
   const { settings } = useSettings();
   const { getLocation } = useLocation();
   const [state, setState] = useState<WeatherState>({ status: 'placeholder', message: 'Weather' });
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const stopPollRef = useRef<(() => void) | undefined>(undefined);
   // Each effect run gets a unique ID. fetchWeather checks this before every setState
   // so a stale in-flight request from a previous run can never overwrite fresh state.
   const runIdRef = useRef(0);
@@ -178,7 +179,7 @@ export function useWeather() {
       }
 
       if (runIdRef.current !== runId) return;
-      intervalRef.current = setInterval(async () => {
+      stopPollRef.current = startVisibleInterval(async () => {
         try {
           await fetchWeather(runId);
         } catch (err) {
@@ -187,7 +188,7 @@ export function useWeather() {
       }, CACHE_EXPIRY);
     })();
 
-    return () => clearInterval(intervalRef.current);
+    return () => stopPollRef.current?.();
     // settings.weather.unit is listed directly so the cache conversion in the effect
     // body always runs with the current unit, not just when fetchWeather recreates.
     // permissionEpoch: refetch once location is granted or revoked.

@@ -3,7 +3,7 @@
  * these instead of touching the `chrome` global, so the `chrome.*` surface
  * lives in src/lib and a test can mock one module rather than a global.
  */
-import type { TabCommand } from './runtime-messages';
+import type { OverlayRequest, TabCommand } from './runtime-messages';
 
 /** False in jsdom and in a page served outside the extension. */
 export const hasChromeApi = typeof chrome !== 'undefined';
@@ -23,9 +23,25 @@ export function extensionUrl(path: string): string {
   return `/${path}`;
 }
 
-/** Sends a tab command to the background worker (handled in background/index.ts). */
+/**
+ * Sends a message to the background worker (handled in background/index.ts) and
+ * resolves with its answer, or null when it cannot be delivered. A content
+ * script outlives an extension update or reload: its `chrome.runtime.id` goes
+ * away and sendMessage throws "Extension context invalidated".
+ */
+export async function sendToBackground<T>(message: TabCommand | OverlayRequest): Promise<T | null> {
+  try {
+    if (!hasChromeApi || !chrome.runtime?.id) return null;
+    return ((await chrome.runtime.sendMessage(message)) ?? null) as T | null;
+  } catch {
+    // Orphaned script or no listener: there is nothing the page can do about it.
+    return null;
+  }
+}
+
+/** Sends a tab command to the background worker, without waiting for it. */
 export function sendTabCommand(command: TabCommand): void {
-  chrome.runtime.sendMessage(command);
+  void sendToBackground(command);
 }
 
 /** Subscribes to runtime messages; returns the unsubscribe function. */

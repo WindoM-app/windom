@@ -65,6 +65,8 @@ function NoClientIdState({ onSaved }: { onSaved: () => void }) {
           <input
             type="text"
             readOnly
+            spellCheck={false}
+            autoComplete="off"
             aria-label="Redirect URI"
             value={redirectUri}
             className="settings-input"
@@ -88,6 +90,8 @@ function NoClientIdState({ onSaved }: { onSaved: () => void }) {
         <input
           type="text"
           placeholder="Spotify Client ID"
+          spellCheck={false}
+          autoComplete="off"
           aria-label="Spotify Client ID"
           value={clientIdInput}
           onChange={(e) => {

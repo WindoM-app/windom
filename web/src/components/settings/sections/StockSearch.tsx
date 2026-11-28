@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useId, useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface SearchResult {
@@ -67,6 +67,9 @@ export function StockSearch({ selected, onChange }: Props) {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
+  const listboxId = useId();
+  const expanded = open && results.length > 0;
+
   function toggle(symbol: string) {
     onChange(selected.includes(symbol) ? selected.filter((s) => s !== symbol) : [...selected, symbol]);
     setQuery('');
@@ -116,6 +119,13 @@ export function StockSearch({ selected, onChange }: Props) {
           ref={inputRef}
           type="text"
           aria-label="Search stocks"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={expanded}
+          aria-controls={expanded ? listboxId : undefined}
+          aria-activedescendant={expanded ? `${listboxId}-${activeIndex}` : undefined}
+          autoComplete="off"
+          spellCheck={false}
           className="settings-input"
           placeholder={selected.length === 0 ? 'Search stocks, e.g. Apple, S&P 500, TSLA…' : 'Add another stock…'}
           value={query}
@@ -139,18 +149,21 @@ export function StockSearch({ selected, onChange }: Props) {
         )}
 
         {open && results.length > 0 && (
-          <div className="stock-dropdown">
+          <div id={listboxId} role="listbox" aria-label="Stocks" aria-multiselectable="true" className="stock-dropdown">
             {results.map((r, i) => {
               const isSelected = selected.includes(r.symbol);
               return (
                 <button
                   key={r.symbol}
                   type="button"
+                  id={`${listboxId}-${i}`}
+                  role="option"
+                  aria-selected={isSelected}
+                  tabIndex={-1}
                   className={`stock-dropdown-item${isSelected ? ' selected' : ''}${i === activeIndex ? ' active' : ''}`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    toggle(r.symbol);
-                  }}
+                  // Keeps focus in the input; the click does the choosing.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => toggle(r.symbol)}
                   onMouseEnter={() => setActiveIndex(i)}
                 >
                   <span className="stock-dropdown-symbol">{r.symbol}</span>

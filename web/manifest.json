@@ -31,10 +31,10 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content/index.tsx"],
+      "js": ["src/content/index.ts"],
       "all_frames": false,
       "match_about_blank": false,
-      "run_at": "document_end"
+      "run_at": "document_idle"
     }
   ],
   "chrome_url_overrides": {

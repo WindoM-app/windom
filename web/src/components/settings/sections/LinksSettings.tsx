@@ -50,6 +50,9 @@ export function LinksSettings() {
                 type="text"
                 value={link.url}
                 placeholder="URL"
+                inputMode="url"
+                spellCheck={false}
+                autoCapitalize="off"
                 aria-label={`Link ${i + 1} URL`}
                 aria-invalid={urlInvalid}
                 title="Enter an HTTP or HTTPS URL"

@@ -2,7 +2,7 @@
    Design tokens - radius, spacing, ink, glass, motion, ...
 
    Declared on `:host` as well as `:root`: the content script
-   (src/content/index.tsx) injects this sheet into a shadow root,
+   (src/content/mount.tsx) injects this sheet into a shadow root,
    where `:root` matches nothing. Custom properties set on the
    shadow host inherit into the tree, so the search overlay on an
    ordinary web page resolves the same tokens as the new tab.
@@ -12,6 +12,8 @@
    ============================================================ */
 :root,
 :host {
+  /* Native controls (colour, range, file, checkbox, autofill) draw dark too. */
+  color-scheme: dark;
   /* Keyboard focus ring: two-tone, because the wallpaper is any photograph
      the user picks. White alone vanishes on a white sky, dark alone on a night
      one. The white outline sits 2px out; the halo is a dark spread wider than
@@ -1071,6 +1073,8 @@ input.clock-size-slider:focus-visible {
   border-radius: var(--r-card);
   opacity: 1;
   cursor: default;
+  /* The pane opens over the clock, which a clear pane lets through at full strength. */
+  background-color: rgba(20, 20, 23, 0.9);
 }
 
 .dock-expand-icon {
