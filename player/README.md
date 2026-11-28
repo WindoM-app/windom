@@ -6,18 +6,21 @@ document. Part of [#576](https://github.com/WindoM-app/windom/issues/576).
 
 ## Hosting
 
-Cloudflare Pages (free plan), connected to this repository:
+Cloudflare Workers static assets (free plan), configured by
+[`wrangler.jsonc`](../wrangler.jsonc) at the repository root and deployed by
+Cloudflare's Git integration:
 
-| Setting | Value |
+| Setting in the dashboard | Value |
 |---|---|
+| Project name | `windom-player` (must match `wrangler.jsonc`) |
 | Production branch | `main` |
-| Framework preset / build command | none |
-| Build output directory | `player` |
-| Preview deployments | none |
-| Build watch paths | `player/*` |
-| Custom domain | `player.windom.app` |
+| Build command | empty |
+| Deploy command | `npx wrangler deploy` |
+| Preview builds | off |
+| Build watch paths | `player/*`, `wrangler.jsonc` |
 
-Do not enable analytics or any other script injection on it.
+The deploy attaches `player.windom.app` itself. Do not enable analytics or any
+other script injection.
 
 ## Rules
 
