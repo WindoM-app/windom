@@ -52,7 +52,7 @@ These need a free WindoM account:
 | Feature | What it does |
 |---|---|
 | Google Calendar | Today and what's coming, read-only |
-| Spotify | Now playing, playback controls, and your top tracks |
+| Spotify | Embedded player from any link (no account); connected: now playing, playback controls, and your top tracks |
 | GitHub | Notifications, review requests and assigned issues |
 | Settings sync | Your setup follows you to any browser you sign in to |
 

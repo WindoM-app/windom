@@ -13,6 +13,7 @@ import { CenterContent } from './components/layout/CenterContent';
 import { BottomSection } from './components/layout/BottomSection';
 import { RightSidebar } from './components/layout/RightSidebar';
 import { SpotifyPlayer } from './components/spotify/SpotifyPlayer';
+import { SpotifyEmbed } from './components/spotify/SpotifyEmbed';
 import { GlassFilters } from './components/GlassFilters';
 import { AppLoader } from './components/AppLoader';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -66,6 +67,9 @@ function Dashboard(): React.ReactElement {
       </ErrorBoundary>
       <ErrorBoundary name="Quote" silent>
         <BottomSection />
+      </ErrorBoundary>
+      <ErrorBoundary name="Spotify embed" silent>
+        <SpotifyEmbed />
       </ErrorBoundary>
       <ErrorBoundary name="Sidebar" silent>
         <RightSidebar />

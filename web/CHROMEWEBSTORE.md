@@ -51,6 +51,10 @@ send page content.
 - Open tabs and history are read in the browser to show them to the user and are
   not sent to the WindoM server.
 - Text typed into the search box is sent to DuckDuckGo for suggestions.
+- If the user saves a Spotify link, the new tab shows Spotify's own embedded
+  player (an `open.spotify.com` frame). Spotify then receives the requests that
+  frame makes, under its own privacy policy. No Spotify code runs in extension
+  pages, and nothing loads before a link is saved. No permission is needed.
 
 The privacy policy is the full statement: <https://windom.app/privacy>.
 

@@ -22,6 +22,25 @@ interface GuideSection {
 
 const SECTIONS: GuideSection[] = [
   {
+    id: 'spotify-link',
+    title: 'Play a Spotify link',
+    summary: 'No account or setup - paste a link.',
+    blocks: [
+      {
+        type: 'steps',
+        content: [
+          'In Spotify, choose Share → Copy link on a song, album, playlist or podcast.',
+          'Open WindoM Settings → Apps → Spotify and paste it under "Play a Spotify link".',
+          "Press Show player. Spotify's player appears in the bottom corner of the new tab.",
+        ],
+      },
+      {
+        type: 'tip',
+        content: 'Hearing only a preview? Sign in at open.spotify.com in this browser. Spotify decides what plays.',
+      },
+    ],
+  },
+  {
     id: 'spotify',
     title: 'Connect Spotify',
     summary: 'Needs a free Spotify Developer app (BYOA) - takes ~2 min.',

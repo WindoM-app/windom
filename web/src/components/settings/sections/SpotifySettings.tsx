@@ -5,6 +5,7 @@ import { useSpotifyConnection, useSpotifySetup } from '../../../hooks/useSpotify
 import { COPY_CONFIRM_DURATION_MS } from '../../../lib/timing-constants';
 import { getAuthRedirectUrl } from '../../../lib/oauth-connection';
 import { SpotifyLogo } from '../../spotify/SpotifyLogo';
+import { SpotifyEmbedSettings } from './SpotifyEmbedSettings';
 
 // ── State 1: No client ID saved ─────────────────────────────────────────────
 
@@ -240,6 +241,16 @@ function ConnectedState({ clientId, onDisconnected }: { clientId: string; onDisc
 // ── Root component ──────────────────────────────────────────────────────────
 
 export function SpotifySettings() {
+  return (
+    <>
+      <SpotifyEmbedSettings />
+      <SpotifyAccountSettings />
+    </>
+  );
+}
+
+/** Signing in to Spotify: player controls and top tracks. */
+function SpotifyAccountSettings() {
   const { state: uiState, setState: setUiState, clientId: savedClientId, changeApp } = useSpotifySetup();
 
   if (uiState === 'loading') {
