@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
+import { removeEmbedItem } from '../lib/spotify-embed';
 import { syncStorage, localStore } from '../lib/chrome-storage';
 import { type Settings, defaultSettings } from '../types/settings';
 import { SECRETS_KEY, stripSecrets, extractSecrets, saveSecrets } from '../lib/secret-settings';
@@ -200,6 +201,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     await written;
     await localStore.remove(SECRETS_KEY);
     await localStore.set('windom_focus', defaultSettings.focus);
+    await removeEmbedItem();
     // A reset is an edit like any other: the next sync uploads the defaults.
     await markUnsynced(Object.keys(pickSyncable(defaultSettings)));
   }, [stamp, setSettings, markUnsynced, syncWriter]);

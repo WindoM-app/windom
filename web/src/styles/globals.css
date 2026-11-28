@@ -570,6 +570,49 @@ input[type='file']::file-selector-button:hover {
   margin-bottom: 90px;
 }
 
+/* Spotify's embedded player, above the settings button. Their frame is shown
+   as it comes, with the corner radius of their embed code and nothing over it. */
+.spotify-embed {
+  position: fixed;
+  left: 10px;
+  bottom: 62px;
+  z-index: var(--z-chrome);
+  width: 300px;
+  height: 152px;
+}
+.spotify-embed iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 12px;
+  color-scheme: normal;
+}
+/* The centred quote narrows rather than running under the player. */
+body:has(.spotify-embed) .bottom-section {
+  max-width: max(380px, min(600px, calc(100vw - 660px)));
+}
+/* Too narrow for both: the player the user asked for wins. */
+@media (max-width: 999px) {
+  body:has(.spotify-embed) .bottom-section {
+    display: none;
+  }
+}
+/* Spotify's compact height where the full one would cover the focus input. */
+@media (max-width: 1220px), (max-height: 760px) {
+  .spotify-embed {
+    height: 80px;
+  }
+}
+.spotify-embed-row .settings-input {
+  flex: 1;
+  min-width: 0;
+}
+.spotify-embed-row .settings-save-btn {
+  flex: none;
+  white-space: nowrap;
+}
+
 /* ============================================================
    Layout: Bottom Section
    ============================================================ */
@@ -2919,6 +2962,7 @@ input[type='checkbox']:focus-visible {
 .top-bar,
 .top-dock-area,
 .bottom-section,
+.spotify-embed,
 .center-content {
   transition: opacity 1.5s ease;
 }
@@ -2934,6 +2978,7 @@ body.focus-exiting .sidebar-container {
 body.focus-entering .top-bar,
 body.focus-entering .top-dock-area,
 body.focus-entering .bottom-section,
+body.focus-entering .spotify-embed,
 body.focus-entering .sidebar-container,
 body.focus-entering .settings-container,
 body.focus-entering .center-content {
@@ -2945,12 +2990,14 @@ body.focus-entering .center-content {
 body.focus-entering-overlay .top-bar,
 body.focus-entering-overlay .top-dock-area,
 body.focus-entering-overlay .bottom-section,
+body.focus-entering-overlay .spotify-embed,
 body.focus-entering-overlay .sidebar-container,
 body.focus-entering-overlay .settings-container,
 body.focus-entering-overlay .center-content,
 body.focus-active .top-bar,
 body.focus-active .top-dock-area,
 body.focus-active .bottom-section,
+body.focus-active .spotify-embed,
 body.focus-active .sidebar-container,
 body.focus-active .settings-container,
 body.focus-active .center-content {
@@ -2963,6 +3010,7 @@ body.focus-active .center-content {
 body.focus-exiting-overlay .top-bar,
 body.focus-exiting-overlay .top-dock-area,
 body.focus-exiting-overlay .bottom-section,
+body.focus-exiting-overlay .spotify-embed,
 body.focus-exiting-overlay .sidebar-container,
 body.focus-exiting-overlay .settings-container,
 body.focus-exiting-overlay .center-content {
@@ -2975,6 +3023,7 @@ body.focus-exiting-overlay .center-content {
 body.focus-exiting .top-bar,
 body.focus-exiting .top-dock-area,
 body.focus-exiting .bottom-section,
+body.focus-exiting .spotify-embed,
 body.focus-exiting .settings-container,
 body.focus-exiting .center-content {
   opacity: 1;

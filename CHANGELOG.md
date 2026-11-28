@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+Web only. No permission, server or schema changes.
+
+### Added
+
+- Play a Spotify link without any account: paste a song, album, playlist or
+  podcast link in Settings → Apps → Spotify and Spotify's own player appears on
+  the new tab. The link stays on the device. Only one WindoM tab plays at a time.
+  (#574)
+
 ## [1.8.3] - 2026-11-28
 
 Spotify and settings-sync fixes. The server and the extension both change; no
